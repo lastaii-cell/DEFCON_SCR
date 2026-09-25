@@ -5,6 +5,8 @@ Mac-only DEFCON Globe screensaver that Ambrosia shipped alongside it. A vector g
 slowly against near-black space while six blocs fight a full nuclear exchange on it: fleets
 put to sea, radar sweeps, bombers scramble, and at DEFCON 1 the missiles fly.
 
+![The globe at DEFCON 1, warheads in flight over the Americas](screenshots/defcon1-exchange.png)
+
 Nothing here is Introversion's code or art — it is an original build that borrows the look.
 
 ## What it does
@@ -20,6 +22,14 @@ A complete war runs in about five and a half minutes, then resets with a fresh s
 | DEFCON 1 | 165 s | Nuclear release: ICBMs, SLBMs, interceptors, cities burn. Hidden orbital platforms unmask and open fire |
 | Aftermath | 26 s | "END OF SIMULATION", final tally, then a new world |
 
+Fleets at sea and air patrols up at DEFCON 3, before anything has been fired:
+
+![DEFCON 3, fleets deployed and air patrols flying](screenshots/defcon3-buildup.png)
+
+And five and a half minutes later, with the tally up and the map gone quiet:
+
+![The aftermath screen, with the final casualty tally](screenshots/aftermath.png)
+
 ## Orbital platforms
 
 Not in the original game. At DEFCON 1 each bloc unmasks one or two weapons platforms, already
@@ -27,6 +37,11 @@ in orbit and until then hidden. Each rides its own great circle, and the stretch
 of it is drawn so you can see where it is heading. A platform picks a city in the cone beneath
 it and fires: a laser does the damage of a warhead, instantly, with the beam visible for a
 little over half a second.
+
+![Orbital platforms in their tracks, with an orbital strike in the log](screenshots/orbital-platforms.png)
+
+The coloured arcs are the stretch of orbit each platform is about to fly through, and the log
+records a strike on Chongqing.
 
 Silos shoot back. Roughly one round in six goes to a direct-ascent anti-satellite shot at a
 platform high enough above the silo's horizon to be engaged. Those climb out of the atmosphere
@@ -107,6 +122,17 @@ Stored under `HKCU\Software\DefconSaver`.
   a bank of consoles rather than a mirror
 - **Draw with the GPU** — on by default; turn it off to force software rendering
 - **Population haze** — a mist over inhabited ground that thins as the people under it die
+
+![The settings dialog](screenshots/settings.png)
+
+The readout, green throughout, with the scanlines on:
+
+![The DEFCON readout in the top-left corner](screenshots/hud-readout.png)
+
+The haze over south and east Asia at DEFCON 3, while the population is still intact. It burns
+off city by city as the warheads land:
+
+![Population haze over south and east Asia](screenshots/population-haze.png)
 
 ## Performance
 
