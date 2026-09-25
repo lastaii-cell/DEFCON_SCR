@@ -45,13 +45,14 @@ records a strike on Chongqing.
 
 Silos shoot back. Roughly one round in six goes to a direct-ascent anti-satellite shot at a
 platform high enough above the silo's horizon to be engaged. Those climb out of the atmosphere
-under their own guidance and chase the platform to wherever it has moved. Over a typical
-exchange that comes to around eight to ten platforms, a couple of dozen laser strikes, and
-most of the platforms eventually knocked down.
+under their own guidance and chase the platform to wherever it has moved. A cycle therefore
+fields six to twelve platforms, one or two per bloc, each carrying five to eight shots, with
+the silos working through them for as long as the exchange lasts.
 
 Each cycle randomises the alliances (two blocs / three pacts / asymmetric / free-for-all),
-unit placement and camera. The camera drifts on its own but eases toward wherever the
-warheads are landing.
+unit placement and camera. The camera spins at its own steady rate, randomised each cycle and
+in either direction, while its latitude drifts on a slow sine. It does not chase the fighting —
+see Known rough edges for why not.
 
 ## Requirements
 
@@ -102,7 +103,9 @@ why the script sets the value directly. If you would rather have it in the dropd
 | `DefconSaver.scr /p <hwnd>` | Preview pane (Windows calls this one) |
 | `DefconSaver.scr /g <dir> [w h] [camLat] [camLon]` | Dumps ten PNG stills across one scenario, with per-stage frame timings |
 | `DefconSaver.scr /x <file> [camLat] [camLon] [px py]` | Writes land-fill geometry diagnostics: which rings sweep the limb, and which ones cover a probe pixel |
-| `DefconSaver.scr /b <file> [w h frames]` | Steady-state frame timing with a per-stage breakdown |
+| `DefconSaver.scr /b <file> [w h frames]` | Steady-state frame timing with a per-stage breakdown. Software path only: `D2DTarget` needs a window, so it cannot be measured offscreen |
+| `DefconSaver.scr /m <file> [seconds]` | Ship movement statistics, for checking that units travel rather than fidget in place |
+| `DefconSaver.scr /d <file>` | Reports which drawing backend this machine gets, and why |
 
 Note that PowerShell's `Start-Process` on a `.scr` goes through the shell and ignores your
 arguments. Invoke it with the call operator (`& .\dist\DefconSaver.scr /w`) or from `cmd`.
@@ -170,7 +173,7 @@ One file per concern, with the two backends interchangeable behind one interface
 | `Geo.cs` | Orthographic sphere camera, coastline rings, the land/sea mask |
 | `LandFill.cs` | Turns a coastline ring into its screen-space silhouette polygon |
 | `Territories.cs` | The six blocs, as prioritised lat/lon boxes |
-| `Cities.cs` | ~135 cities with populations; they are the targets and the score |
+| `Cities.cs` | 143 cities with populations; they are the targets and the score |
 | `Sim.cs` | Units, missiles, blasts, orbital platforms, the DEFCON clock, the AI |
 | `Scene.cs` | Everything drawn, in terms neither backend owns |
 | `IDrawTarget.cs` | The drawing operations `Scene` needs, and nothing else |
