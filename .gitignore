@@ -1,0 +1,15 @@
+# Build output
+bin/
+obj/
+dist/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+# The Natural Earth source data. Not committed: it is 1.6 MB, it never changes,
+# and tools/make_land_bin.py says where to fetch it. Assets/land.bin is the
+# 50 KB product and IS committed, so a normal build needs neither.
+ne_50m_land.geojson
