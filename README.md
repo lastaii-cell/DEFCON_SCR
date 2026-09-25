@@ -224,8 +224,10 @@ python tools\make_land_bin.py ne_50m_land.geojson Assets\land.bin
 
 ## Known rough edges
 
-- Missile trails are clipped at the horizon rather than drawn above it, so a warhead vanishes
-  as it crosses the limb. Deliberate: it keeps the edge of the globe clean.
+- Nuclear missile arcs are clipped at the surface horizon rather than drawn above it, so a
+  warhead vanishes as it crosses the limb. Deliberate: it keeps the edge of the globe clean.
+  Anything that genuinely flies high — platforms, their beams, anti-satellite shots and the
+  kills — is culled against the horizon for its own altitude instead.
 - A landmass that is almost entirely behind the globe contributes a thin sliver of fill along
   the limb rather than its true silhouette. At that angle the difference is a pixel or two.
 - Inland seas that are holes in a land polygon (the Caspian, for one) are filled as land.

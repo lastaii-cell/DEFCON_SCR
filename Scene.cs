@@ -368,7 +368,8 @@ public sealed class Scene
             float x = cxs * ca + (ux * ct + vx * st) * sa;
             float y = cys * ca + (uy * ct + vy * st) * sa;
             float z = czs * ca + (uz * ct + vz * st) * sa;
-            if (cam.ProjectAlt(x, y, z, alt, out float sx, out float sy) > 0f) PolyAdd(sx, sy);
+            if (cam.ProjectAlt(x, y, z, alt, out float sx, out float sy) > OrbitalHorizon(alt))
+                PolyAdd(sx, sy);
             else PolyFlush(colour, width);
         }
         PolyFlush(colour, width);
@@ -653,7 +654,8 @@ public sealed class Scene
     {
         foreach (Laser l in w.Lasers)
         {
-            if (cam.ProjectAlt(l.Ax, l.Ay, l.Az, l.Alt, out float x0, out float y0) <= 0f) continue;
+            if (cam.ProjectAlt(l.Ax, l.Ay, l.Az, l.Alt, out float x0, out float y0)
+                <= OrbitalHorizon(l.Alt)) continue;
             if (cam.Project(l.Bx, l.By, l.Bz, out float x1, out float y1) <= 0f) continue;
 
             float a = Math.Clamp(l.Life / l.MaxLife, 0f, 1f);
@@ -692,14 +694,16 @@ public sealed class Scene
                 PolyReset();
                 for (int i = 0; i < m.TrailCount; i++)
                 {
-                    if (cam.ProjectAlt(m.Tx[i], m.Ty[i], m.Tz[i], m.Ta[i], out float sx, out float sy) > 0f)
-                        PolyAdd(sx, sy);
+                    float depth = cam.ProjectAlt(m.Tx[i], m.Ty[i], m.Tz[i], m.Ta[i],
+                                                 out float sx, out float sy);
+                    if (depth > OrbitalHorizon(m.Ta[i])) PolyAdd(sx, sy);
                     else PolyFlush(streak, thin);
                 }
                 PolyFlush(streak, thin);
             }
 
-            if (cam.ProjectAlt(m.Px, m.Py, m.Pz, m.Alt, out float hx, out float hy) > 0f)
+            float headFloor = m.Nuke ? 0f : OrbitalHorizon(m.Alt);
+            if (cam.ProjectAlt(m.Px, m.Py, m.Pz, m.Alt, out float hx, out float hy) > headFloor)
             {
                 float r = (m.Nuke ? 2.1f : 1.3f) * scale;
                 _target.FillEllipse(hx, hy, r, r, head);
@@ -734,7 +738,8 @@ public sealed class Scene
             float radius = b.MaxRad * MathF.Sqrt(t) * (float)Geo.R2D;
             float alpha = 1f - t;
 
-            if (cam.ProjectAlt(b.Px, b.Py, b.Pz, b.Alt, out float sx, out float sy) > -0.2f)
+            if (cam.ProjectAlt(b.Px, b.Py, b.Pz, b.Alt, out float sx, out float sy)
+                > OrbitalHorizon(b.Alt) - 0.2f)
             {
                 float fade = MathF.Pow(1f - t, 1.5f);
                 float core = fade * 26f * scale * (b.MaxRad > 0.03f ? 1f : 0.35f);
