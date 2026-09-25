@@ -136,26 +136,34 @@ off city by city as the warheads land:
 
 ## Performance
 
-There is no Direct3D or Direct2D here: every frame is drawn on the CPU with GDI+ and blitted
-to the window. That keeps the whole thing dependency-free and means it behaves the same on a
-laptop with no usable GPU driver, at the cost of a ceiling on what it can push.
+Two backends draw the same scene. Direct2D is the default and puts it on the GPU; GDI+ is the
+software fallback, used when Direct2D will not start or when you turn the GPU off in settings.
+`DEFCON_BACKEND` forces either one.
 
-Measured with `/b` on a 24-core i9-13900K, full HUD, grid, scanlines and Soft glow:
+Measured on a 24-core i9-13900K with an RTX 5090, in a window, with the world frozen at
+DEFCON 1 so both backends draw an identical scene. Frame cap off, first second discarded:
 
-| Resolution | Frame | Steady rate |
+| Resolution | GDI+ | Direct2D |
 |---|---|---|
-| 2560 x 1440 | 15.9 ms (p95 16.7) | 63 fps |
-| 1920 x 1200 | 13.2 ms (p95 13.9) | 76 fps |
+| 1280 x 720 | 15.98 ms (p95 17.3), 63 fps | 8.33 ms, 120 fps |
+| 1920 x 1080 | 29.28 ms (p95 31.5), 34 fps | 8.33 ms, 120 fps |
 
-Multiple monitors are drawn in parallel, one task each, so a second screen costs wall-clock
-time only if it is slower than the first rather than adding to it. Three things dominate what
-is left: the land fill (~4.8 ms), the graticule (~1.6 ms) and the missile trails.
+Read the Direct2D column carefully: 8.33 ms is exactly this display's 120 Hz refresh interval,
+and it is identical at both resolutions because the backend is waiting for the screen rather
+than for the GPU. Its real cost is somewhere below that, and this harness cannot separate the
+two. GDI+ is genuinely render-bound and roughly doubles from 720p to 1080p.
 
-If frames are tight, turn the glow down first, then the grid.
+On the software path the glow composite dominates, then the coastlines, then the graticule and
+the population haze. If frames are tight, turn the glow down first, then the grid.
+
+Multiple monitors are drawn in parallel on the software path, one task each, so a second screen
+costs wall-clock time only if it is slower than the first rather than adding to it. Direct2D
+render targets cannot be used that way — `CanDrawOffThread` is false for them — so with the GPU
+backend the screens are drawn one after another on the UI thread.
 
 ## How it is put together
 
-Plain GDI+, no GPU dependency, one file per concern:
+One file per concern, with the two backends interchangeable behind one interface:
 
 | File | Role |
 |---|---|
@@ -164,22 +172,31 @@ Plain GDI+, no GPU dependency, one file per concern:
 | `Territories.cs` | The six blocs, as prioritised lat/lon boxes |
 | `Cities.cs` | ~135 cities with populations; they are the targets and the score |
 | `Sim.cs` | Units, missiles, blasts, orbital platforms, the DEFCON clock, the AI |
-| `Renderer.cs` | Everything drawn, including the bloom and the HUD |
+| `Scene.cs` | Everything drawn, in terms neither backend owns |
+| `IDrawTarget.cs` | The drawing operations `Scene` needs, and nothing else |
+| `GdiTarget.cs` / `D2DTarget.cs` | The software and GPU implementations of it |
+| `Palette.cs` | Faction and interface colours |
 | `SaverForm.cs` / `SaverHost.cs` | Windows, input handling, the frame loop |
 | `ConfigForm.cs` | The `/c` dialog |
+| `Settings.cs` | The registry-backed options |
+| `Program.cs` | Entry point, argument parsing and the diagnostic modes |
+| `Profile.cs` | Per-stage timings, on only for `/g` and `/b` |
 
-Three details worth knowing if you change things:
+Four details worth knowing if you change things:
 
 - **The readiness readout and its announcements are one colour**, green, including the big
   banner. That banner is drawn twice: once crisp, and once into the glow layer through its own
   font slot, because that layer is a quarter of the size and a full-size font would land four
   times too large there.
-- **The glow** is the scene re-drawn into a quarter-size *transparent* buffer at half alpha,
-  then blended back up. Over a near-black background that reads as additive bloom, and it
-  avoids GDI+'s slow colour-matrix path. It is composited only over the box around the globe.
+- **The glow**, on both backends, is the scene re-drawn into a quarter-size *transparent*
+  buffer at half alpha and blended back up. Over a near-black background that reads as additive
+  bloom, and it avoids GDI+'s slow colour-matrix path. It is composited only over the box around
+  the globe. Because that layer is a quarter scale, a stroke thinner than four pixels lands
+  under one pixel in it and disappears — `Scene.Stroke` is the floor that stops that, and the
+  glow spread setting scales it.
 - **That upscale is the one loop written out by hand.** `Graphics.DrawImage` will do it in a
   line, but its bilinear stretch costs about 7 ns per destination pixel on a single thread,
-  which at 1440p was half the frame. `Renderer.CompositeGlow` does the same filtering across
+  which at 1440p was half the frame. `GdiTarget.CompositeGlow` does the same filtering across
   all cores and skips fully transparent pixels, which took it from 14.7 ms to 0.95 ms. Dropping
   to nearest-neighbour instead is cheaper still and looks visibly blocky, so it is not used.
 - **Landmasses crossing the horizon** are filled by projecting hidden vertices out onto the limb
