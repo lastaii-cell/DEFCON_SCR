@@ -2,6 +2,27 @@ namespace DefconSaver;
 
 public enum UnitKind { Silo, Radar, Airbase, Carrier, Battleship, Sub, Bomber, Fighter, Orbital }
 
+/// <summary>
+/// A group of ships that sails as one. Surface fleets and submarine packs are both this;
+/// they differ only in what is in them and where they are allowed to go. The leader picks
+/// destinations and everyone else keeps station on it.
+/// </summary>
+public sealed class Fleet
+{
+    public readonly List<Unit> Members = new();
+    public Unit Lead;
+
+    /// <summary>The senior survivor, promoting one if the last leader has been sunk.</summary>
+    public Unit Commander()
+    {
+        if (Lead != null && Lead.Alive) return Lead;
+        Lead = null;
+        foreach (Unit m in Members)
+            if (m.Alive) { Lead = m; break; }
+        return Lead;
+    }
+}
+
 public sealed class Unit
 {
     public UnitKind Kind;
@@ -22,6 +43,12 @@ public sealed class Unit
     public float Wobble;
     public float RepickIn;       // seconds before another destination may be chosen
     public float Stuck;          // seconds spent unable to move
+
+    // Ships only. A member holds station at a bearing and range measured from its leader,
+    // both relative to the leader's heading, so the shape turns with the formation.
+    public Fleet Fleet;
+    public float StationBearing;
+    public float StationRange;
 
     /// <summary>Distance from the centre of the globe, 1 being the surface.</summary>
     public float Alt = 1.002f;
@@ -265,29 +292,77 @@ public sealed class World
             Add(UnitKind.Airbase, f, la, lo, stagger += 0.09f, ammo: 6);
         }
 
-        int fleets = 3 + Rng.Next(2);
-        for (int i = 0; i < fleets; i++)
+        // Surface fleets: a carrier and its escorts. Kept clear of the ice, like any ship
+        // that has to stay on top of the water.
+        int surface = 2 + Rng.Next(2);
+        for (int i = 0; i < surface; i++)
+            if (FleetAnchor(f, surfaceOnly: true, out float la, out float lo))
+                Squadron(f, la, lo, 2 + Rng.Next(4), ref stagger, submarines: false);
+
+        // Submarine packs hunt on their own and may go under the pole, so they get their own
+        // groups rather than riding along with a carrier that cannot follow them there.
+        int packs = 1 + Rng.Next(2);
+        for (int i = 0; i < packs; i++)
+            if (FleetAnchor(f, surfaceOnly: false, out float la, out float lo))
+                Squadron(f, la, lo, 2 + Rng.Next(4), ref stagger, submarines: true);
+    }
+
+    /// <summary>
+    /// Open water for a group to form up in, or false if none was found. Keeps its distance
+    /// from ships already placed for the first few tries, then takes what it can get rather
+    /// than leaving a bloc a fleet short in a busy sea.
+    /// </summary>
+    private bool FleetAnchor(int f, bool surfaceOnly, out float lat, out float lon)
+    {
+        for (int attempt = 0; attempt < 24; attempt++)
         {
-            // Anchor the group in water a surface ship could actually reach.
-            float la = 0f, lo = 0f;
-            bool found = false;
-            for (int attempt = 0; attempt < 12 && !found; attempt++)
-                found = Territories.RandomSea(f, Rng, 22f, out la, out lo)
-                        && MathF.Abs(la) <= SurfaceLatLimit - 4f;
-            if (!found) continue;
-            int size = 3 + Rng.Next(3);
-            for (int j = 0; j < size; j++)
-            {
-                Geo.Move(la, lo, Rng.Next(360), 0.7f + (float)Rng.NextDouble() * 1.6f,
-                         out float sla, out float slo);
-                if (Geo.IsLand(sla, slo)) { sla = la; slo = lo; }
-                UnitKind k = j == 0 ? UnitKind.Carrier
-                           : (Rng.Next(3) == 0 ? UnitKind.Sub : UnitKind.Battleship);
-                Unit u = Add(k, f, sla, slo, stagger += 0.06f,
-                             ammo: k == UnitKind.Sub ? 5 : 0);
-                u.Speed = k == UnitKind.Sub ? 0.30f : 0.24f;
-            }
+            if (!Territories.RandomSea(f, Rng, 22f, out lat, out lon)) continue;
+            if (surfaceOnly && MathF.Abs(lat) > SurfaceLatLimit - 4f) continue;
+            if (attempt < 18 && Crowded(lat, lon, 11f)) continue;
+            return true;
         }
+
+        lat = 0f; lon = 0f;
+        return false;
+    }
+
+    private bool Crowded(float lat, float lon, float withinDeg)
+    {
+        foreach (Unit u in Units)
+            if (u.IsShip && Geo.Dist(u.Lat, u.Lon, lat, lon) < withinDeg) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Builds one group around an anchor. The first ship leads and the rest are given a
+    /// station astern of it, alternating quarters so a fleet under way reads as two short
+    /// columns rather than a huddle.
+    /// </summary>
+    private void Squadron(int f, float lat, float lon, int size, ref float stagger, bool submarines)
+    {
+        var fleet = new Fleet();
+        float course = Rng.Next(360);
+
+        for (int j = 0; j < size; j++)
+        {
+            float bearing = j == 0 ? 0f : 180f + (j % 2 == 0 ? -30f : 30f);
+            float range = j == 0 ? 0f : 1.6f + 1.1f * j;
+
+            Geo.Move(lat, lon, course + bearing, range, out float sla, out float slo);
+            if (Geo.IsLand(sla, slo)) { sla = lat; slo = lon; }
+
+            UnitKind k = submarines ? UnitKind.Sub
+                       : (j == 0 ? UnitKind.Carrier : UnitKind.Battleship);
+            Unit u = Add(k, f, sla, slo, stagger += 0.06f, ammo: submarines ? 5 : 0);
+            u.Speed = submarines ? 0.30f : 0.24f;
+            u.Heading = course;
+            u.Fleet = fleet;
+            u.StationBearing = bearing;
+            u.StationRange = range;
+            fleet.Members.Add(u);
+        }
+
+        fleet.Lead = fleet.Members.Count > 0 ? fleet.Members[0] : null;
     }
 
     /// <summary>Launchers sit near the people they are defending, not scattered over tundra.</summary>
@@ -518,20 +593,76 @@ public sealed class World
             Palette.Hot(Palette.Faction[u.Faction], 0.45f));
     }
 
+    /// <summary>How near its station counts as on it. Below this the ship stops steering.</summary>
+    private const float StationSlack = 0.6f;
+
+    /// <summary>
+    /// Where a follower should be: off its leader, at the bearing and range it was given,
+    /// rotated with the leader's course. Returns false for a leader, a lone ship, or a group
+    /// with nothing left afloat. Falls back to the mirrored quarter and then to the leader's
+    /// own position when the station itself is over land or above the ice.
+    /// </summary>
+    private bool Station(Unit u, out Unit lead, out float lat, out float lon)
+    {
+        lead = null; lat = 0f; lon = 0f;
+        if (u.Fleet == null) return false;
+
+        lead = u.Fleet.Commander();
+        if (lead == null || lead == u) return false;
+
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            float bearing = attempt == 0 ? u.StationBearing : 360f - u.StationBearing;
+            Geo.Move(lead.Lat, lead.Lon, lead.Heading + bearing, u.StationRange,
+                     out lat, out lon);
+            if (!Geo.IsLand(lat, lon) && !Barred(u, lat, lon)) return true;
+        }
+
+        lat = lead.Lat; lon = lead.Lon;
+        return true;
+    }
+
     private void Steer(Unit u, float dt)
     {
         if (u.RepickIn > 0f) u.RepickIn -= dt;
 
-        bool arrived = u.HasTarget && Geo.Dist(u.Lat, u.Lon, u.TgtLat, u.TgtLon) < 1.2f;
-        if ((!u.HasTarget || arrived) && u.RepickIn <= 0f)
+        float speed = u.Speed;
+        float want;
+
+        if (Station(u, out Unit lead, out float sla, out float slo))
         {
-            PickDestination(u);
-            // A ship wedged in a bay can fail this over and over. Waiting between attempts is
-            // what stops it spinning on the spot: its heading only moves when the plan does.
-            u.RepickIn = u.HasTarget ? 1f : 3f + (float)Rng.NextDouble() * 4f;
+            float gap = Geo.ShortDist(u.Lat, u.Lon, sla, slo);
+            if (gap < StationSlack)
+            {
+                // On station. Steering at a point a third of a degree away is what made ships
+                // pirouette, so match the leader's course instead and simply cruise with it.
+                u.HasTarget = false;
+                want = lead.Heading;
+            }
+            else
+            {
+                u.TgtLat = sla; u.TgtLon = slo; u.HasTarget = true;
+                want = Geo.Bearing(u.Lat, u.Lon, sla, slo);
+
+                // Enough to close a gap opened by a turn, not enough to look like a race.
+                speed *= Math.Clamp(gap, 1f, 1.7f);
+            }
+        }
+        else
+        {
+            bool arrived = u.HasTarget && Geo.Dist(u.Lat, u.Lon, u.TgtLat, u.TgtLon) < 1.2f;
+            if ((!u.HasTarget || arrived) && u.RepickIn <= 0f)
+            {
+                PickDestination(u);
+                // A ship wedged in a bay can fail this over and over. Waiting between attempts
+                // is what stops it spinning on the spot: its heading only moves when the plan
+                // does.
+                u.RepickIn = u.HasTarget ? 1f : 3f + (float)Rng.NextDouble() * 4f;
+            }
+
+            want = u.HasTarget ? Geo.Bearing(u.Lat, u.Lon, u.TgtLat, u.TgtLon) : u.Heading;
         }
 
-        float want = u.HasTarget ? Geo.Bearing(u.Lat, u.Lon, u.TgtLat, u.TgtLon) : u.Heading;
         if (u.IsShip) want = ClearHeading(u, want);
 
         // Turn at a limited rate rather than snapping. Without this a ship near a coast flips
@@ -539,7 +670,7 @@ public sealed class World
         float maxTurn = (u.IsAir ? 110f : 30f) * dt;
         u.Heading = StepHeading(u.Heading, want, maxTurn);
 
-        Geo.Move(u.Lat, u.Lon, u.Heading, u.Speed * dt, out float la, out float lo);
+        Geo.Move(u.Lat, u.Lon, u.Heading, speed * dt, out float la, out float lo);
 
         if (u.IsShip && Barred(u, la, lo))
         {

@@ -118,6 +118,20 @@ public static class Geo
         return (float)(Math.Acos(d) * R2D);
     }
 
+    /// <summary>
+    /// Separation in degrees, for the small angles station keeping works in. Dist takes the
+    /// arc cosine of a dot product, which loses its resolution as that dot approaches 1 -
+    /// exactly where a ship holding station spends its life. The half-chord does not.
+    /// </summary>
+    public static float ShortDist(float lat1, float lon1, float lat2, float lon2)
+    {
+        ToVec(lat1, lon1, out float ax, out float ay, out float az);
+        ToVec(lat2, lon2, out float bx, out float by, out float bz);
+        double dx = ax - bx, dy = ay - by, dz = az - bz;
+        double half = Math.Min(1.0, Math.Sqrt(dx * dx + dy * dy + dz * dz) * 0.5);
+        return (float)(2.0 * Math.Asin(half) * R2D);
+    }
+
     /// <summary>Initial bearing from one point to another, in degrees clockwise from north.</summary>
     public static float Bearing(float lat1, float lon1, float lat2, float lon2)
     {

@@ -15,8 +15,8 @@ A complete war runs in about five and a half minutes, then resets with a fresh s
 
 | Phase | Roughly | What happens |
 |---|---|---|
-| DEFCON 5 | 42 s | Silos, radar and airbases fade in; fleets sail |
-| DEFCON 4 | 30 s | Fleets manoeuvre, radar sweeps turn. Surface ships keep below 66 degrees; only submarines work under the ice |
+| DEFCON 5 | 42 s | Silos, radar and airbases fade in; fleets form up and put to sea |
+| DEFCON 4 | 30 s | Fleets manoeuvre in formation, radar sweeps turn. Surface ships keep below 66 degrees; only submarines work under the ice |
 | DEFCON 3 | 30 s | Fighters and bombers launch from airbases |
 | DEFCON 2 | 28 s | Weapons free — ships and aircraft start shooting |
 | DEFCON 1 | 165 s | Nuclear release: ICBMs, SLBMs, interceptors, cities burn. Hidden orbital platforms unmask and open fire |
@@ -185,8 +185,18 @@ One file per concern, with the two backends interchangeable behind one interface
 | `Program.cs` | Entry point, argument parsing and the diagnostic modes |
 | `Profile.cs` | Per-stage timings, on only for `/g` and `/b` |
 
-Four details worth knowing if you change things:
+Five details worth knowing if you change things:
 
+- **Ships sail in groups, not alone.** Each bloc puts to sea with two or three surface fleets,
+  a carrier and its escorts, and one or two submarine packs, two to five hulls in each.
+  Submarines get their own packs rather than riding with a carrier, because they can work under
+  the ice and a carrier cannot follow them there. One ship leads and picks where the group is
+  going; the rest hold a station astern of it, at a bearing measured from the leader's heading
+  so the shape turns as a piece. A ship within `StationSlack` of its station stops steering
+  altogether and matches the leader's course — steering at a point a fraction of a degree away
+  is precisely what used to make ships pirouette. Stations are 2.7 to 6 degrees out, because a
+  degree is about five pixels at 1080p and a ship icon is nearer fifteen: any closer and the
+  group draws as one smudge.
 - **The readiness readout and its announcements are one colour**, green, including the big
   banner. That banner is drawn twice: once crisp, and once into the glow layer through its own
   font slot, because that layer is a quarter of the size and a full-size font would land four
