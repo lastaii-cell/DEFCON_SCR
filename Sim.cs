@@ -58,6 +58,9 @@ public sealed class Unit
     public float Ox, Oy, Oz, Wx, Wy, Wz;
     public float Theta, OrbitRate;
 
+    /// <summary>A city just struck from orbit, to be hit again while it is still overhead.</summary>
+    public City Relock;
+
     public bool IsShip => Kind is UnitKind.Carrier or UnitKind.Battleship or UnitKind.Sub;
     public bool IsAir => Kind is UnitKind.Bomber or UnitKind.Fighter;
     public bool IsBase => Kind is UnitKind.Silo or UnitKind.Radar or UnitKind.Airbase;
@@ -395,7 +398,7 @@ public sealed class World
                 {
                     Kind = UnitKind.Orbital,
                     Faction = f,
-                    Ammo = 5 + Rng.Next(4),
+                    Ammo = 10 + Rng.Next(7),
                     Alt = 1.24f,
                     Fade = -0.3f * i,
                     Cooldown = 1f + (float)Rng.NextDouble() * 3f,
@@ -554,27 +557,53 @@ public sealed class World
         if (Defcon != 1 || Aftermath) return;
         if (u.Cooldown > 0f || u.Ammo <= 0 || u.Fade < 1f) return;
 
+        // A city hit from orbit gets a second pass while the platform is still above it. If
+        // it has gone over the horizon in the meantime the re-engagement is simply dropped.
         City target = null;
-        float best = 0f;
-        for (int i = 0; i < 24; i++)
+        bool again = false;
+        if (u.Relock != null)
         {
-            City c = Cities[Rng.Next(Cities.Length)];
-            if (c.Dead || c.Territory < 0 || !Hostile(u.Faction, c.Territory)) continue;
+            if (Visible(u, u.Relock)) { target = u.Relock; again = true; }
+            u.Relock = null;
+        }
 
-            // Only what the platform can see: a cone under it, not the far side of the world.
-            float dot = u.Px * c.Px + u.Py * c.Py + u.Pz * c.Pz;
-            if (dot < 0.6f) continue;
-            float score = c.Alive * dot;
-            if (score > best) { best = score; target = c; }
+        if (target == null)
+        {
+            float best = 0f;
+            for (int i = 0; i < 24; i++)
+            {
+                City c = Cities[Rng.Next(Cities.Length)];
+                if (!Visible(u, c)) continue;
+                float score = c.Alive * (u.Px * c.Px + u.Py * c.Py + u.Pz * c.Pz);
+                if (score > best) { best = score; target = c; }
+            }
         }
         if (target == null) return;
 
         u.Ammo--;
-        u.Cooldown = 5f + (float)Rng.NextDouble() * 5f;
-        FireLaser(u, target);
+        if (again)
+        {
+            // A pair averages 1.55 s then 6.0 s, so 7.55 s for two shots against the 7.5 s
+            // one shot used to take: twice as often overall, in twos rather than singly.
+            u.Cooldown = 4.5f + (float)Rng.NextDouble() * 3.0f;
+        }
+        else
+        {
+            u.Relock = target;
+            u.Cooldown = 1.1f + (float)Rng.NextDouble() * 0.9f;   // the follow-up, shortly after
+        }
+        FireLaser(u, target, again);
     }
 
-    private void FireLaser(Unit u, City c)
+    /// <summary>
+    /// Whether a platform can engage a city: hostile, still alive, and inside the cone beneath
+    /// it rather than round the far side of the world.
+    /// </summary>
+    private bool Visible(Unit u, City c)
+        => !c.Dead && c.Territory >= 0 && Hostile(u.Faction, c.Territory)
+           && u.Px * c.Px + u.Py * c.Py + u.Pz * c.Pz >= 0.6f;
+
+    private void FireLaser(Unit u, City c, bool again = false)
     {
         var beam = new Laser
         {
@@ -588,8 +617,8 @@ public sealed class World
         Lasers.Add(beam);
         LasersFired++;
 
-        float killed = Detonate(c.Lat, c.Lon, u.Faction, c, announce: false);
-        Say($"ORBITAL STRIKE - {c.Name} - {killed:0.0}M DEAD",
+        float killed = Detonate(c.Lat, c.Lon, u.Faction, c, announce: false, yield: 0.5f);
+        Say($"ORBITAL {(again ? "RESTRIKE" : "STRIKE")} - {c.Name} - {killed:0.0}M DEAD",
             Palette.Hot(Palette.Faction[u.Faction], 0.45f));
     }
 
@@ -993,9 +1022,16 @@ public sealed class World
         Geo.ToLatLon(m.Px, m.Py, m.Pz, out m.Lat, out m.Lon);
     }
 
-    private float Detonate(float lat, float lon, int faction, City aimed, bool announce = true)
+    /// <param name="yield">
+    /// Scales the casualties, the fireball and the radius in which it wrecks units. One is a
+    /// warhead. The area it reaches is deliberately not scaled: a weaker strike covers the
+    /// same ground and simply kills less of it.
+    /// </param>
+    private float Detonate(float lat, float lon, int faction, City aimed, bool announce = true,
+                           float yield = 1f)
     {
-        AddBlast(lat, lon, 5.2f, 3.6f, faction);
+        float spread = MathF.Sqrt(yield);
+        AddBlast(lat, lon, 5.2f * spread, 3.6f * spread, faction);
 
         float killed = 0f;
         foreach (City c in Cities)
@@ -1004,7 +1040,7 @@ public sealed class World
             float d = Geo.Dist(lat, lon, c.Lat, c.Lon);
             if (d > 4.2f) continue;
             float share = Math.Clamp(1f - d / 4.2f, 0f, 1f);
-            float loss = c.Alive * (0.35f + 0.55f * share);
+            float loss = c.Alive * (0.35f + 0.55f * share) * yield;
             c.Alive = Math.Max(0f, c.Alive - loss);
             c.Flash = 1f;
             c.Hits++;
@@ -1016,7 +1052,7 @@ public sealed class World
         foreach (Unit u in Units)
         {
             if (!u.Alive || u.IsAir || u.IsOrbital) continue;
-            if (Geo.Dist(lat, lon, u.Lat, u.Lon) < 2.6f) u.Alive = false;
+            if (Geo.Dist(lat, lon, u.Lat, u.Lon) < 2.6f * spread) u.Alive = false;
         }
 
         if (announce && aimed != null && killed > 0.4f)

@@ -35,8 +35,14 @@ And five and a half minutes later, with the tally up and the map gone quiet:
 Not in the original game. At DEFCON 1 each bloc unmasks one or two weapons platforms, already
 in orbit and until then hidden. Each rides its own great circle, and the stretch of orbit ahead
 of it is drawn so you can see where it is heading. A platform picks a city in the cone beneath
-it and fires: a laser does the damage of a warhead, instantly, with the beam visible for a
-little over half a second.
+it and fires: the beam shows for a little over half a second and does half the damage of a
+warhead, spread over the same ground.
+
+Strikes come in pairs. Having hit a city, a platform re-engages the same one a second or two
+later while it is still overhead, and the log calls that a RESTRIKE; if the city has gone over
+the horizon in the meantime the follow-up is dropped and the platform picks a fresh target. So
+it fires about twice as often as it used to for half the effect each time, and carries ten to
+sixteen rounds to pay for it.
 
 ![Orbital platforms in their tracks, with an orbital strike in the log](screenshots/orbital-platforms.png)
 
@@ -45,9 +51,10 @@ records a strike on Chongqing.
 
 Silos shoot back. Roughly one round in six goes to a direct-ascent anti-satellite shot at a
 platform high enough above the silo's horizon to be engaged. Those climb out of the atmosphere
-under their own guidance and chase the platform to wherever it has moved. A cycle therefore
-fields six to twelve platforms, one or two per bloc, each carrying five to eight shots, with
-the silos working through them for as long as the exchange lasts.
+under their own guidance and chase the platform to wherever it has moved. A cycle fields six
+to twelve platforms, one or two per bloc. Over the reference scenario — `/m`, which runs the
+fixed seed and counts them — that came to ten platforms, 75 laser strikes, nine anti-satellite
+shots and nine platforms knocked down.
 
 Each cycle randomises the alliances (two blocs / three pacts / asymmetric / free-for-all),
 unit placement and camera. The camera spins at its own steady rate, randomised each cycle and
