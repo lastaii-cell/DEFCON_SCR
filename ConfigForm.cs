@@ -15,6 +15,23 @@ public sealed class ConfigForm : Form
 
     private readonly Settings _cfg;
 
+    private const string Title = "DEFCON GLOBE";
+    private const string Subtitle = "A wireframe globe playing itself to pieces.";
+
+    private static readonly string[] CheckText =
+    {
+        "Show the DEFCON readout, tallies and log",
+        "Label major cities",
+        "Draw the latitude / longitude grid",
+        "Show population as a haze that thins as people die",
+        "CRT scanlines",
+        "Show a different longitude on each monitor",
+        "Draw with the GPU (Direct2D) when available",
+    };
+
+    // One line of body text, and the spacings derived from it. Set once in Build.
+    private int _em, _pad, _gap, _content;
+
     private DarkSlider _speed, _globe, _glowStroke;
     private ComboBox _bloom;
     private NumericUpDown _fps;
@@ -28,6 +45,12 @@ public sealed class ConfigForm : Form
         Pull();
     }
 
+    /// <summary>
+    /// Lays the dialog out from the rendered font rather than from fixed pixel positions.
+    /// It was written the other way round - a point-sized font over a 470 by 586 pixel
+    /// grid - so on a high-DPI screen the text grew while the dialog did not: captions ran
+    /// off the right edge, values sat under their labels and the frame cap was cut in half.
+    /// </summary>
     private void Build()
     {
         Text = "DEFCON Globe Screensaver";
@@ -35,29 +58,44 @@ public sealed class ConfigForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(470, 586);
+        AutoScaleMode = AutoScaleMode.None;     // the measurements below already carry the scale
         BackColor = Back;
         ForeColor = Ink;
-        Font = new Font("Consolas", 9.75f);
+        Font = new Font("Consolas", BaseFontPoints());
 
-        int y = 16;
+        var titleFont = new Font(Font.FontFamily, Font.SizeInPoints * 1.75f, FontStyle.Bold);
+
+        _em = Font.Height;
+        _pad = _em;
+        _gap = Math.Max(2, _em / 3);
+
+        // The width is whatever the longest line needs, not a number typed in once.
+        _content = Math.Max(TextRenderer.MeasureText(Subtitle, Font).Width,
+                            TextRenderer.MeasureText(Title, titleFont).Width);
+        foreach (string t in CheckText)
+            _content = Math.Max(_content, _em + _gap + TextRenderer.MeasureText(t, Font).Width);
+        _content = Math.Max(_content, _em * 22);
+
+        int y = _pad;
+
         Add(new Label
         {
-            Text = "DEFCON GLOBE",
-            Font = new Font("Consolas", 17f, FontStyle.Bold),
+            Text = Title,
+            Font = titleFont,
             ForeColor = Accent,
             AutoSize = true,
-            Location = new Point(18, y),
+            Location = new Point(_pad, y),
         });
-        y += 32;
+        y += titleFont.Height + _gap;
+
         Add(new Label
         {
-            Text = "A wireframe globe playing itself to pieces.",
+            Text = Subtitle,
             ForeColor = InkDim,
             AutoSize = true,
-            Location = new Point(18, y),
+            Location = new Point(_pad, y),
         });
-        y += 30;
+        y += _em * 2;
 
         _speedValue = Section("SIMULATION SPEED", ref y);
         _speed = Slider(25, 300, ref y);
@@ -68,47 +106,57 @@ public sealed class ConfigForm : Form
         _globe.ValueChanged += (_, _) => _globeValue.Text = $"{_globe.Value}%";
 
         Section("GLOW", ref y);
+
+        // Frame cap is pinned to the right edge and the drop-down takes what is left, so the
+        // two cannot collide however wide the text turns out to be.
+        _fps = new NumericUpDown
+        {
+            Minimum = 20,
+            Maximum = 120,
+            Increment = 5,
+            Width = TextRenderer.MeasureText("1200", Font).Width + _em * 2,
+            BackColor = Panel,
+            ForeColor = Ink,
+            BorderStyle = BorderStyle.FixedSingle,
+        };
+        var capLabel = new Label { Text = "FRAME CAP", ForeColor = InkDim, AutoSize = true };
+
+        _fps.Location = new Point(_pad + _content - _fps.Width, y);
+        capLabel.Location = new Point(
+            _fps.Left - TextRenderer.MeasureText(capLabel.Text, Font).Width - _gap,
+            y + Math.Max(0, (_fps.Height - _em) / 2));
+
         _bloom = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(20, y),
-            Width = 180,
+            Location = new Point(_pad, y),
+            Width = Math.Max(_em * 8, capLabel.Left - _pad - _gap * 2),
             BackColor = Panel,
             ForeColor = Ink,
             FlatStyle = FlatStyle.Flat,
         };
         _bloom.Items.AddRange(new object[] { "Off (fastest)", "Soft", "Full bloom" });
         Add(_bloom);
-
-        Add(new Label { Text = "FRAME CAP", ForeColor = InkDim, AutoSize = true, Location = new Point(250, y + 3) });
-        _fps = new NumericUpDown
-        {
-            Location = new Point(348, y),
-            Width = 90,
-            Minimum = 20,
-            Maximum = 120,
-            Increment = 5,
-            BackColor = Panel,
-            ForeColor = Ink,
-            BorderStyle = BorderStyle.FixedSingle,
-        };
+        Add(capLabel);
         Add(_fps);
-        y += 40;
+        y += Math.Max(_bloom.Height, _fps.Height) + _em;
 
         _glowStrokeValue = Section("GLOW SPREAD", ref y);
         _glowStroke = Slider(90, 300, ref y);
         _glowStroke.ValueChanged += (_, _) => _glowStrokeValue.Text = $"{_glowStroke.Value / 100f:0.00}x";
 
-        _hud = Check("Show the DEFCON readout, tallies and log", ref y);
-        _names = Check("Label major cities", ref y);
-        _grid = Check("Draw the latitude / longitude grid", ref y);
-        _population = Check("Show population as a haze that thins as people die", ref y);
-        _scan = Check("CRT scanlines", ref y);
-        _perMonitor = Check("Show a different longitude on each monitor", ref y);
-        _gpu = Check("Draw with the GPU (Direct2D) when available", ref y);
+        y += _gap;
+        _hud = Check(CheckText[0], ref y);
+        _names = Check(CheckText[1], ref y);
+        _grid = Check(CheckText[2], ref y);
+        _population = Check(CheckText[3], ref y);
+        _scan = Check(CheckText[4], ref y);
+        _perMonitor = Check(CheckText[5], ref y);
+        _gpu = Check(CheckText[6], ref y);
 
-        y += 14;
-        Button preview = MakeButton("PREVIEW", 20, y, 130);
+        y += _em;
+        int bw = (_content - _gap * 2) / 3;
+        Button preview = MakeButton("PREVIEW", _pad, y, bw);
         preview.Click += (_, _) =>
         {
             Push();
@@ -126,14 +174,46 @@ public sealed class ConfigForm : Form
             }
         };
 
-        Button ok = MakeButton("SAVE", 190, y, 120);
+        Button ok = MakeButton("SAVE", _pad + bw + _gap, y, bw);
         ok.Click += (_, _) => { Push(); _cfg.Save(); DialogResult = DialogResult.OK; Close(); };
 
-        Button cancel = MakeButton("CANCEL", 320, y, 120);
+        Button cancel = MakeButton("CANCEL", _pad + (bw + _gap) * 2, y,
+                                   _content - (bw + _gap) * 2);
         cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
 
         AcceptButton = ok;
         CancelButton = cancel;
+
+        y += cancel.Height + _pad;
+
+        // At a large text size the dialog can want more height than the screen has. Scroll
+        // rather than push the buttons off the bottom where they cannot be reached at all.
+        // The check box captions were sized from an estimate of the glyph; ask the controls
+        // themselves what they actually came out as, so nothing is clipped by a few pixels.
+        int reach = _content + _pad;
+        foreach (Control c in Controls) reach = Math.Max(reach, c.Right);
+
+        Rectangle work = Screen.FromPoint(Cursor.Position).WorkingArea;
+        int wantW = reach + _pad;
+        int wantH = y;
+        int roomH = work.Height - _em * 3;
+        if (wantH > roomH)
+        {
+            AutoScroll = true;
+            wantW += SystemInformation.VerticalScrollBarWidth;
+            wantH = roomH;
+        }
+        ClientSize = new Size(Math.Min(wantW, work.Width), wantH);
+    }
+
+    /// <summary>
+    /// Point size for the dialog font. DEFCON_UIFONT overrides it, which is how the layout
+    /// gets checked at the sizes a high-DPI tablet produces without touching display settings.
+    /// </summary>
+    private static float BaseFontPoints()
+    {
+        string s = Environment.GetEnvironmentVariable("DEFCON_UIFONT");
+        return float.TryParse(s, out float pt) && pt >= 6f && pt <= 48f ? pt : 9.75f;
     }
 
     /// <summary>Asks the desktop compositor for a dark title bar so the frame matches the dialog.</summary>
@@ -158,18 +238,20 @@ public sealed class ConfigForm : Form
 
     private Label Section(string title, ref int y)
     {
-        Add(new Label { Text = title, ForeColor = InkDim, AutoSize = true, Location = new Point(18, y) });
+        Add(new Label { Text = title, ForeColor = InkDim, AutoSize = true, Location = new Point(_pad, y) });
+
+        int w = _em * 6;
         var value = new Label
         {
             ForeColor = Accent,
             AutoSize = false,
             TextAlign = ContentAlignment.MiddleRight,
-            Size = new Size(140, 16),
-            Location = new Point(310, y),
+            Size = new Size(w, _em + _gap),
+            Location = new Point(_pad + _content - w, y),
             Text = "",
         };
         Add(value);
-        y += 20;
+        y += _em + _gap;
         return value;
     }
 
@@ -177,8 +259,8 @@ public sealed class ConfigForm : Form
     {
         var t = new DarkSlider
         {
-            Location = new Point(20, y),
-            Size = new Size(430, 26),
+            Location = new Point(_pad, y),
+            Size = new Size(_content, (int)(_em * 1.8f)),
             Minimum = min,
             Maximum = max,
             BackColor = Back,
@@ -186,7 +268,7 @@ public sealed class ConfigForm : Form
             Fill = Accent,
         };
         Add(t);
-        y += 34;
+        y += t.Height + _gap;
         return t;
     }
 
@@ -196,12 +278,12 @@ public sealed class ConfigForm : Form
         {
             Text = text,
             AutoSize = true,
-            Location = new Point(20, y),
+            Location = new Point(_pad, y),
             ForeColor = Ink,
             FlatStyle = FlatStyle.Flat,
         };
         Add(c);
-        y += 26;
+        y += Math.Max(c.Height, _em) + _gap;
         return c;
     }
 
@@ -211,7 +293,7 @@ public sealed class ConfigForm : Form
         {
             Text = text,
             Location = new Point(x, y),
-            Size = new Size(w, 34),
+            Size = new Size(w, (int)(_em * 2.2f)),
             FlatStyle = FlatStyle.Flat,
             BackColor = Panel,
             ForeColor = Ink,
@@ -294,7 +376,12 @@ public sealed class ConfigForm : Form
 
         private float Fraction => Maximum > Minimum ? (_value - Minimum) / (float)(Maximum - Minimum) : 0f;
 
-        private int ThumbX => 9 + (int)(Fraction * (Width - 18));
+        /// <summary>Everything here was drawn for a 26 pixel track. Scale it with the control.</summary>
+        private float K => Math.Max(1f, Height / 26f);
+
+        private int Inset => (int)(9f * K);
+
+        private int ThumbX => Inset + (int)(Fraction * (Width - Inset * 2));
 
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -302,25 +389,35 @@ public sealed class ConfigForm : Form
             g.Clear(BackColor);
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
+            float k = K;
+            int inset = Inset;
             int mid = Height / 2;
-            var groove = new Rectangle(9, mid - 3, Width - 18, 6);
+            int half = Math.Max(2, (int)(3f * k));
+
+            var groove = new Rectangle(inset, mid - half, Width - inset * 2, half * 2);
             using (var b = new SolidBrush(Track)) g.FillRectangle(b, groove);
-            using (var p = new Pen(Color.FromArgb(70, Fill), 1f)) g.DrawRectangle(p, groove);
+            using (var p = new Pen(Color.FromArgb(70, Fill), k)) g.DrawRectangle(p, groove);
 
             int tx = ThumbX;
             using (var b = new SolidBrush(Color.FromArgb(120, Fill)))
-                g.FillRectangle(b, 9, mid - 3, tx - 9, 6);
+                g.FillRectangle(b, inset, mid - half, tx - inset, half * 2);
+
+            int tw = Math.Max(3, (int)(4f * k));
+            int th = Math.Max(7, (int)(9f * k));
             using (var b = new SolidBrush(Fill))
-                g.FillRectangle(b, tx - 4, mid - 9, 8, 18);
+                g.FillRectangle(b, tx - tw, mid - th, tw * 2, th * 2);
 
             if (Focused)
-                using (var p = new Pen(Color.FromArgb(120, Fill), 1f))
-                    g.DrawRectangle(p, tx - 6, mid - 11, 12, 22);
+            {
+                int o = Math.Max(2, (int)(2f * k));
+                using (var p = new Pen(Color.FromArgb(120, Fill), k))
+                    g.DrawRectangle(p, tx - tw - o, mid - th - o, tw * 2 + o * 2, th * 2 + o * 2);
+            }
         }
 
         private void SetFromX(int x)
         {
-            float f = Math.Clamp((x - 9) / (float)Math.Max(1, Width - 18), 0f, 1f);
+            float f = Math.Clamp((x - Inset) / (float)Math.Max(1, Width - Inset * 2), 0f, 1f);
             Value = Minimum + (int)MathF.Round(f * (Maximum - Minimum));
         }
 

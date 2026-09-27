@@ -272,6 +272,7 @@ Useful when comparing backends or chasing a rendering difference; none are neede
 | `DEFCON_TRACE` | Logs why the full-screen loop ended |
 | `DEFCON_LAND` | Land fill colour as `r,g,b`, if you want it lighter or deeper |
 | `DEFCON_GLOWSTROKE` | Overrides the glow spread setting, for testing |
+| `DEFCON_UIFONT` | Point size for the `/c` dialog font, 6 to 48. Checks the layout at the sizes a high-DPI screen produces |
 
 A fixed seed plus a frozen clock is what makes the two backends render the very same world,
 which is the only way to compare them pixel for pixel.
