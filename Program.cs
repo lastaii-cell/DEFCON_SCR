@@ -384,6 +384,14 @@ internal static class Program
         sb.AppendLine($"  orbital: {world.PlatformsRevealed} platforms revealed, " +
                       $"{world.LasersFired} laser strikes, {world.AsatsLaunched} anti-satellite shots, " +
                       $"{world.PlatformsLost} platforms destroyed");
+        sb.AppendLine($"  orbital defence: {world.GuardsLaunched} interceptors away, " +
+                      $"{world.AsatsStopped} anti-satellite shots stopped");
+        var decks = world.Units.Where(u => u.Alive && u.Kind == UnitKind.Carrier).ToList();
+        int aloft = world.Units.Count(u => u.Alive && u.IsNaval);
+        int fullest = decks.Select(c => world.Units.Count(a => a.Alive && a.Home == c))
+                           .DefaultIfEmpty(0).Max();
+        sb.AppendLine($"  naval air: {aloft} aircraft aloft from {decks.Count} carriers, " +
+                      $"busiest deck {fullest}");
         sb.AppendLine("  beams visible at: " + string.Join(", ", beamTimes.Select(v => $"{v:0.0}s")));
         File.WriteAllText(outPath, sb.ToString());
     }

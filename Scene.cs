@@ -670,7 +670,6 @@ public sealed class Scene
     {
         float scale = _ui * px;
         float thin = Stroke(1.1f);
-        float hotW = Stroke(1.8f);
         Color interceptor = Col(Color.FromArgb(170, 210, 230, 255));
         Color asat = Col(Color.FromArgb(210, 255, 236, 180));
         Color head = Col(Palette.Nuke);
@@ -679,14 +678,12 @@ public sealed class Scene
         {
             if (m.Nuke)
             {
-                // The whole flown arc, brightening toward the warhead.
-                float t = m.T;
-                Color cold = Col(Palette.Fade(Palette.Faction[m.Faction], 0.26f));
-                Color warm = Col(Palette.Fade(Palette.Faction[m.Faction], 0.62f));
-                Color hot = Col(Palette.Hot(Palette.Faction[m.Faction], 0.6f));
-                ArcBand(ref cam, m, 0f, t * 0.60f, cold, thin);
-                ArcBand(ref cam, m, t * 0.60f, t * 0.87f, warm, thin);
-                ArcBand(ref cam, m, t * 0.87f, t, hot, hotW);
+                // One weight and one colour for the whole flown arc, the faint one. It used
+                // to brighten and thicken toward the warhead, which at DEFCON 1 put dozens of
+                // hot streaks over the globe and buried everything under them. The warhead
+                // itself is still marked, so the leading end is not lost.
+                Color trail = Col(Palette.Fade(Palette.Faction[m.Faction], 0.26f));
+                ArcBand(ref cam, m, 0f, m.T, trail, thin);
             }
             else
             {

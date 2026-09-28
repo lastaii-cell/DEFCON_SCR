@@ -61,6 +61,17 @@ public sealed class Unit
     /// <summary>A city just struck from orbit, to be hit again while it is still overhead.</summary>
     public City Relock;
 
+    /// <summary>Interceptors a platform still has for the shots coming at it.</summary>
+    public int Interceptors;
+
+    /// <summary>Seconds before a platform may put up another interceptor.</summary>
+    public float Guard;
+
+    /// <summary>The deck or field an aircraft flew from; null for anything else.</summary>
+    public Unit Home;
+
+    public bool IsNaval => Home != null && Home.Kind == UnitKind.Carrier;
+
     public bool IsShip => Kind is UnitKind.Carrier or UnitKind.Battleship or UnitKind.Sub;
     public bool IsAir => Kind is UnitKind.Bomber or UnitKind.Fighter;
     public bool IsBase => Kind is UnitKind.Silo or UnitKind.Radar or UnitKind.Airbase;
@@ -90,6 +101,7 @@ public sealed class Missile
     public float Lat, Lon;
 
     public Missile Prey;         // interceptors only
+    public bool Hunted;          // an interceptor is already on its way to this one
     public Unit TargetPlatform;  // anti-satellite shots only
     public float Speed;          // chasing shots only
     public City TargetCity;
@@ -189,7 +201,7 @@ public sealed class World
     public readonly bool[] Playing = new bool[Factions];
 
     // Running totals for the orbital campaign, handy in the HUD and in diagnostics.
-    public int PlatformsRevealed, LasersFired, AsatsLaunched, PlatformsLost;
+    public int PlatformsRevealed, LasersFired, AsatsLaunched, PlatformsLost, GuardsLaunched, AsatsStopped;
 
     public int Defcon = 5;
     public bool Aftermath;
@@ -229,6 +241,7 @@ public sealed class World
         Cities = CityData.Build();
 
         PlatformsRevealed = LasersFired = AsatsLaunched = PlatformsLost = 0;
+        GuardsLaunched = AsatsStopped = 0;
         Defcon = 5;
         Aftermath = false;
         PhaseTime = PhaseSeconds[5];
@@ -356,7 +369,8 @@ public sealed class World
 
             UnitKind k = submarines ? UnitKind.Sub
                        : (j == 0 ? UnitKind.Carrier : UnitKind.Battleship);
-            Unit u = Add(k, f, sla, slo, stagger += 0.06f, ammo: submarines ? 5 : 0);
+            int ammo = submarines ? 5 : k == UnitKind.Carrier ? CarrierWing : 0;
+            Unit u = Add(k, f, sla, slo, stagger += 0.06f, ammo: ammo);
             u.Speed = submarines ? 0.30f : 0.24f;
             u.Heading = course;
             u.Fleet = fleet;
@@ -399,6 +413,7 @@ public sealed class World
                     Kind = UnitKind.Orbital,
                     Faction = f,
                     Ammo = 10 + Rng.Next(7),
+                    Interceptors = OrbitalGuards,
                     Alt = 1.24f,
                     Fade = -0.3f * i,
                     Cooldown = 1f + (float)Rng.NextDouble() * 3f,
@@ -523,15 +538,23 @@ public sealed class World
         u.Sweep += dt * (u.Kind == UnitKind.Radar ? 1.5f : 3f);
         if (u.Cooldown > 0f) u.Cooldown -= dt;
 
+        if (u.Guard > 0f) u.Guard -= dt;
+
         if (u.IsAir)
         {
             u.Life -= dt;
-            if (u.Life <= 0f) { u.Alive = false; return; }
+            if (u.Life <= 0f)
+            {
+                u.Alive = false;
+                // Recovered aboard rather than lost, if there is still a deck to land on.
+                if (u.IsNaval && u.Home.Alive && u.Home.Ammo < CarrierWing) u.Home.Ammo++;
+                return;
+            }
         }
 
         if (u.IsOrbital) { OrbitalUpdate(u, dt); return; }
         if (u.IsShip || u.IsAir) Steer(u, dt);
-        if (u.Kind == UnitKind.Airbase && Defcon <= 3) Scramble(u, dt);
+        if ((u.Kind == UnitKind.Airbase || u.Kind == UnitKind.Carrier) && Defcon <= 3) Scramble(u, dt);
         if (Defcon == 1 && !Aftermath) NuclearRelease(u);
     }
 
@@ -555,6 +578,8 @@ public sealed class World
         OrbitalMove(u, dt);
 
         if (Defcon != 1 || Aftermath) return;
+
+        GuardAgainstAsat(u);
         if (u.Cooldown > 0f || u.Ammo <= 0 || u.Fade < 1f) return;
 
         // A city hit from orbit gets a second pass while the platform is still above it. If
@@ -596,6 +621,50 @@ public sealed class World
     }
 
     /// <summary>
+    /// Puts an interceptor in the way of an anti-satellite shot already climbing toward this
+    /// platform. Five apiece, one at a time, and never two at the same missile: a platform can
+    /// hold off a few rounds but not an exchange's worth.
+    /// </summary>
+    private void GuardAgainstAsat(Unit u)
+    {
+        if (u.Interceptors <= 0 || u.Guard > 0f || Missiles.Count == 0) return;
+
+        Missile inbound = null;
+        float bestD = float.MaxValue;
+        for (int i = 0; i < Missiles.Count; i++)
+        {
+            Missile m = Missiles[i];
+            if (!m.Alive || m.Hunted || m.TargetPlatform != u) continue;
+
+            float dx = m.Px * m.Alt - u.Px * u.Alt;
+            float dy = m.Py * m.Alt - u.Py * u.Alt;
+            float dz = m.Pz * m.Alt - u.Pz * u.Alt;
+            float d = dx * dx + dy * dy + dz * dz;
+            if (d < bestD) { bestD = d; inbound = m; }
+        }
+        if (inbound == null) return;
+
+        u.Interceptors--;
+        u.Guard = 1.4f + (float)Rng.NextDouble() * 1.2f;
+        inbound.Hunted = true;
+
+        var g = new Missile
+        {
+            Faction = u.Faction,
+            Nuke = false,
+            Prey = inbound,
+            Speed = 11f,
+            Duration = 8f,
+            Alt = u.Alt,
+            Px = u.Px, Py = u.Py, Pz = u.Pz,
+            Lat = u.Lat, Lon = u.Lon,
+        };
+        g.Ax = g.Px; g.Ay = g.Py; g.Az = g.Pz;
+        Missiles.Add(g);
+        GuardsLaunched++;
+    }
+
+    /// <summary>
     /// Whether a platform can engage a city: hostile, still alive, and inside the cone beneath
     /// it rather than round the far side of the world.
     /// </summary>
@@ -624,6 +693,19 @@ public sealed class World
 
     /// <summary>How near its station counts as on it. Below this the ship stops steering.</summary>
     private const float StationSlack = 0.6f;
+
+    /// <summary>Aircraft a carrier can have in the air at once, and the size of its complement.</summary>
+    private const int CarrierWing = 6;
+
+    /// <summary>Interceptors a platform carries against anti-satellite shots.</summary>
+    private const int OrbitalGuards = 5;
+
+    /// <summary>
+    /// Chance one of them works. At a certainty five interceptors made a platform almost
+    /// unkillable - 26 of 28 shots stopped in testing, and platform losses fell from nine to
+    /// two - which took the threat out of the silos entirely.
+    /// </summary>
+    private const double OrbitalGuardHit = 0.55;
 
     /// <summary>
     /// Where a follower should be: off its leader, at the bearing and range it was given,
@@ -800,23 +882,38 @@ public sealed class World
         }
     }
 
-    private void Scramble(Unit airbase, float dt)
+    private void Scramble(Unit host, float dt)
     {
-        if (airbase.Cooldown > 0f || airbase.Ammo <= 0) return;
-        int airborne = 0;
-        foreach (Unit u in Units)
-            if (u.IsAir && u.Faction == airbase.Faction) airborne++;
-        if (airborne >= 10) return;
+        if (host.Cooldown > 0f || host.Ammo <= 0) return;
 
-        airbase.Cooldown = 7f + (float)Rng.NextDouble() * 9f;
-        airbase.Ammo--;
+        bool deck = host.Kind == UnitKind.Carrier;
+        if (deck)
+        {
+            // A carrier's limit is its own deck, not the bloc's total air activity.
+            int wing = 0;
+            foreach (Unit u in Units)
+                if (u.Alive && u.IsAir && u.Home == host) wing++;
+            if (wing >= CarrierWing) return;
+        }
+        else
+        {
+            int airborne = 0;
+            foreach (Unit u in Units)
+                if (u.IsAir && u.Faction == host.Faction) airborne++;
+            if (airborne >= 10) return;
+        }
+
+        host.Cooldown = deck ? 4f + (float)Rng.NextDouble() * 5f
+                             : 7f + (float)Rng.NextDouble() * 9f;
+        host.Ammo--;
 
         bool bomber = Defcon <= 2 && Rng.Next(3) != 0;
-        Unit a = Add(bomber ? UnitKind.Bomber : UnitKind.Fighter, airbase.Faction,
-                     airbase.Lat, airbase.Lon, 0f, ammo: bomber ? 2 : 0);
+        Unit a = Add(bomber ? UnitKind.Bomber : UnitKind.Fighter, host.Faction,
+                     host.Lat, host.Lon, 0f, ammo: bomber ? 2 : 0);
         a.Fade = 0.4f;
         a.Speed = bomber ? 0.95f : 1.8f;
         a.Life = bomber ? 260f : 150f;
+        a.Home = host;
     }
 
     private void NuclearRelease(Unit u)
@@ -944,9 +1041,23 @@ public sealed class World
             float d = Geo.Dist(lat, lon, plat, plon);
             if (d < 1.4f)
             {
+                // Only a platform's own interceptors chase an anti-satellite shot; the point
+                // defence down on the surface filters for warheads.
+                bool asat = m.Prey.TargetPlatform != null;
                 m.Alive = false;
+
+                if (asat && Rng.NextDouble() > OrbitalGuardHit)
+                {
+                    // A miss. The shot keeps climbing and the platform has to spend another
+                    // round on it, which is what stops five interceptors being a force field.
+                    m.Prey.Hunted = false;
+                    AddBlast(plat, plon, 0.7f, 0.5f, m.Faction, m.Prey.Alt);
+                    return;
+                }
+
                 m.Prey.Alive = false;
-                AddBlast(plat, plon, 1.1f, 0.7f, m.Faction);
+                if (asat) AsatsStopped++;
+                AddBlast(plat, plon, 1.1f, 0.7f, m.Faction, m.Prey.Alt);
                 return;
             }
             float step = Math.Min(m.Speed * dt, d);
@@ -1110,7 +1221,8 @@ public sealed class World
             {
                 Unit b = Units[j];
                 if (!b.Alive || b.IsBase || b.IsOrbital || !Hostile(a.Faction, b.Faction)) continue;
-                if (a.Kind == UnitKind.Fighter && b.Kind != UnitKind.Bomber && b.Kind != UnitKind.Fighter) continue;
+                if (a.Kind == UnitKind.Fighter && !a.IsNaval
+                    && b.Kind != UnitKind.Bomber && b.Kind != UnitKind.Fighter) continue;
                 float d = Geo.Dist(a.Lat, a.Lon, b.Lat, b.Lon);
                 if (d < bestD) { bestD = d; best = b; }
             }
@@ -1138,8 +1250,9 @@ public sealed class World
         for (int i = 0; i < Units.Count; i++)
         {
             Unit d = Units[i];
-            if (!d.Alive || d.IsAir || d.IsOrbital) continue;
-            if (d.Kind != UnitKind.Silo && d.Kind != UnitKind.Battleship && d.Kind != UnitKind.Carrier) continue;
+            if (!d.Alive || d.IsOrbital) continue;
+            if (!d.IsNaval && d.Kind != UnitKind.Silo
+                && d.Kind != UnitKind.Battleship && d.Kind != UnitKind.Carrier) continue;
             if (d.Cooldown > 0f || Rng.NextDouble() > dt * 0.9) continue;
 
             Missile prey = null;

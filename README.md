@@ -17,7 +17,7 @@ A complete war runs in about five and a half minutes, then resets with a fresh s
 |---|---|---|
 | DEFCON 5 | 42 s | Silos, radar and airbases fade in; fleets form up and put to sea |
 | DEFCON 4 | 30 s | Fleets manoeuvre in formation, radar sweeps turn. Surface ships keep below 66 degrees; only submarines work under the ice |
-| DEFCON 3 | 30 s | Fighters and bombers launch from airbases |
+| DEFCON 3 | 30 s | Fighters and bombers launch from airbases and from carrier decks |
 | DEFCON 2 | 28 s | Weapons free — ships and aircraft start shooting |
 | DEFCON 1 | 165 s | Nuclear release: ICBMs, SLBMs, interceptors, cities burn. Hidden orbital platforms unmask and open fire |
 | Aftermath | 26 s | "END OF SIMULATION", final tally, then a new world |
@@ -49,12 +49,18 @@ sixteen rounds to pay for it.
 The coloured arcs are the stretch of orbit each platform is about to fly through, and the log
 records a strike on Chongqing.
 
+A platform is not defenceless. It carries five interceptors and will put one in the way of an
+anti-satellite shot climbing toward it, one at a time and never two at the same round. They
+work about half the time: at a certainty five of them made a platform almost unkillable and
+took the silos out of the picture entirely, so a miss leaves the shot climbing and costs the
+platform another round.
+
 Silos shoot back. Roughly one round in six goes to a direct-ascent anti-satellite shot at a
 platform high enough above the silo's horizon to be engaged. Those climb out of the atmosphere
 under their own guidance and chase the platform to wherever it has moved. A cycle fields six
 to twelve platforms, one or two per bloc. Over the reference scenario — `/m`, which runs the
-fixed seed and counts them — that came to ten platforms, 75 laser strikes, nine anti-satellite
-shots and nine platforms knocked down.
+fixed seed and counts them — that came to eleven platforms, 121 laser strikes, 31
+anti-satellite shots of which 19 were intercepted, and six platforms knocked down.
 
 Each cycle randomises the alliances (two blocs / three pacts / asymmetric / free-for-all),
 unit placement and camera. The camera spins at its own steady rate, randomised each cycle and
@@ -192,8 +198,14 @@ One file per concern, with the two backends interchangeable behind one interface
 | `Program.cs` | Entry point, argument parsing and the diagnostic modes |
 | `Profile.cs` | Per-stage timings, on only for `/g` and `/b` |
 
-Five details worth knowing if you change things:
+Six details worth knowing if you change things:
 
+- **A carrier flies its own wing.** Six aircraft, launched from the deck rather than counted
+  against the bloc's airbases, and recovered aboard when their endurance runs out so the deck
+  keeps cycling. Naval fighters go after shipping as well as other aircraft, which land-based
+  fighters do not, and naval air can be vectored onto an inbound warhead like a silo or a
+  battleship. The limit is the deck: six aloft from that carrier, whatever else the bloc is
+  flying.
 - **Ships sail in groups, not alone.** Each bloc puts to sea with two or three surface fleets,
   a carrier and its escorts, and one or two submarine packs, two to five hulls in each.
   Submarines get their own packs rather than riding with a carrier, because they can work under
