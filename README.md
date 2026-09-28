@@ -198,7 +198,7 @@ One file per concern, with the two backends interchangeable behind one interface
 | `Program.cs` | Entry point, argument parsing and the diagnostic modes |
 | `Profile.cs` | Per-stage timings, on only for `/g` and `/b` |
 
-Six details worth knowing if you change things:
+Seven details worth knowing if you change things:
 
 - **A carrier flies its own wing.** Six aircraft, launched from the deck rather than counted
   against the bloc's airbases, and recovered aboard when their endurance runs out so the deck
@@ -226,6 +226,13 @@ Six details worth knowing if you change things:
   the globe. Because that layer is a quarter scale, a stroke thinner than four pixels lands
   under one pixel in it and disappears — `Scene.Stroke` is the floor that stops that, and the
   glow spread setting scales it.
+- **A detonation is white, and is built from stacked discs rather than one.** A single filled
+  circle ends at full white with ocean in the next pixel, which reads as a plate rather than a
+  light; the fireball is a bright centre over a wide faint skirt so it falls off over twenty-odd
+  pixels instead of one. The glow layer cannot supply that on its own, since it is composited
+  only over the box around the globe. A lens flare goes on in the glow layer only — a long
+  streak across, a shorter vertical and two diagonals — where the blur is what softens it.
+  Drawn on the sharp layer the same lines read as drawn lines rather than as light.
 - **That upscale is the one loop written out by hand.** `Graphics.DrawImage` will do it in a
   line, but its bilinear stretch costs about 7 ns per destination pixel on a single thread,
   which at 1440p was half the frame. `GdiTarget.CompositeGlow` does the same filtering across

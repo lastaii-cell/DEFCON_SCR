@@ -670,8 +670,9 @@ public sealed class Scene
     {
         float scale = _ui * px;
         float thin = Stroke(1.1f);
-        Color interceptor = Col(Color.FromArgb(170, 210, 230, 255));
-        Color asat = Col(Color.FromArgb(210, 255, 236, 180));
+        float hair = Stroke(0.9f);
+        Color interceptor = Col(Color.FromArgb(95, 210, 230, 255));
+        Color asat = Col(Color.FromArgb(120, 255, 236, 180));
         Color head = Col(Palette.Nuke);
 
         foreach (Missile m in w.Missiles)
@@ -694,9 +695,9 @@ public sealed class Scene
                     float depth = cam.ProjectAlt(m.Tx[i], m.Ty[i], m.Tz[i], m.Ta[i],
                                                  out float sx, out float sy);
                     if (depth > OrbitalHorizon(m.Ta[i])) PolyAdd(sx, sy);
-                    else PolyFlush(streak, thin);
+                    else PolyFlush(streak, hair);
                 }
-                PolyFlush(streak, thin);
+                PolyFlush(streak, hair);
             }
 
             float headFloor = m.Nuke ? 0f : OrbitalHorizon(m.Alt);
@@ -726,6 +727,28 @@ public sealed class Scene
         PolyFlush(colour, width);
     }
 
+    /// <summary>
+    /// A lens flare over a detonation: the long anamorphic streak across, a shorter vertical
+    /// and two diagonals. Drawn into the glow layer only, so the blur is what softens it -
+    /// laid on the sharp layer these read as drawn lines rather than as light.
+    /// </summary>
+    private void Flare(float cx, float cy, float reach, float alpha)
+    {
+        if (reach < 2f || alpha <= 0.02f) return;
+
+        Color bar = Col(Palette.Fade(Color.White, alpha * 0.7f));
+        Color arm = Col(Palette.Fade(Color.White, alpha * 0.34f));
+
+        _target.Line(cx - reach, cy, cx + reach, cy, bar, Stroke(1.5f));
+
+        float up = reach * 0.34f;
+        _target.Line(cx, cy - up, cx, cy + up, arm, Stroke(1.2f));
+
+        float d = reach * 0.2f;
+        _target.Line(cx - d, cy - d, cx + d, cy + d, arm, Stroke(1f));
+        _target.Line(cx - d, cy + d, cx + d, cy - d, arm, Stroke(1f));
+    }
+
     private void DrawBlasts(ref Cam cam, float px, World w)
     {
         float scale = _ui * px;
@@ -739,27 +762,50 @@ public sealed class Scene
                 > OrbitalHorizon(b.Alt) - 0.2f)
             {
                 float fade = MathF.Pow(1f - t, 1.5f);
-                float core = fade * 26f * scale * (b.MaxRad > 0.03f ? 1f : 0.35f);
+                float core = fade * 19f * scale * (b.MaxRad > 0.03f ? 1f : 0.35f);
 
                 // A broad, faint disc laid into the glow layer only. It is blurred on the way
                 // back up, which is what gives a detonation the wide soft corona the game has
                 // rather than a hard white dot.
                 if (_inGlow && core > 0.4f)
                 {
-                    // Nested discs rather than one big one: a single filled circle upscaled out
-                    // of the glow layer keeps a hard rim and reads as a grey plate.
-                    for (int ring = 4; ring >= 1; ring--)
+                    // Many faint discs rather than a few strong ones. Four at a quarter alpha
+                    // each banded into visible rings once the layer was blurred back up; these
+                    // overlap closely enough to pass for a falloff.
+                    for (int ring = 9; ring >= 1; ring--)
                     {
-                        float halo = core * (0.8f + 0.62f * ring);
+                        float halo = core * (0.5f + 0.34f * ring);
                         _target.FillEllipse(sx, sy, halo, halo,
-                                            Col(Palette.Fade(Palette.Nuke, alpha * 0.24f)));
+                                            Col(Palette.Fade(Color.White, alpha * 0.10f)));
                     }
+
+                    // Only the real detonations throw a flare; interceptor pops would litter
+                    // the globe with streaks.
+                    if (b.MaxRad > 0.03f) Flare(sx, sy, core * 8.5f, fade);
                 }
 
                 if (core > 0.4f)
                 {
-                    _target.FillEllipse(sx, sy, core, core, Col(Palette.Fade(
-                        Palette.Mix(Palette.Nuke, Palette.Faction[b.Faction], t * 0.7f), alpha)));
+                    // Stepped out from a bright centre rather than one flat disc, which read
+                    // as a white plate with a hard rim now that it is no longer cream.
+                    Color tint = Palette.Mix(Color.White, Palette.Faction[b.Faction], t * 0.35f);
+
+                    // A skirt first, well outside the fireball and very faint, then the bright
+                    // centre over it. Without the skirt the disc ended at full white and the
+                    // next pixel was ocean - measured as 245 then 22 - which is a plate, not
+                    // a light. The glow layer cannot supply the falloff on its own: it is
+                    // composited only over the box around the globe and is gone within a few
+                    // pixels of the rim.
+                    for (int i = 6; i >= 1; i--)
+                    {
+                        float r = core * (0.8f + 0.28f * i);
+                        _target.FillEllipse(sx, sy, r, r, Col(Palette.Fade(tint, alpha * 0.07f)));
+                    }
+                    for (int i = 4; i >= 1; i--)
+                    {
+                        float r = core * (0.12f + 0.16f * i);
+                        _target.FillEllipse(sx, sy, r, r, Col(Palette.Fade(tint, alpha * 0.45f)));
+                    }
                 }
                 if (t < 0.3f)
                 {
