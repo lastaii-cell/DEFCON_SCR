@@ -230,9 +230,12 @@ Seven details worth knowing if you change things:
   circle ends at full white with ocean in the next pixel, which reads as a plate rather than a
   light; the fireball is a bright centre over a wide faint skirt so it falls off over twenty-odd
   pixels instead of one. The glow layer cannot supply that on its own, since it is composited
-  only over the box around the globe. A lens flare goes on in the glow layer only — a long
-  streak across, a shorter vertical and two diagonals — where the blur is what softens it.
-  Drawn on the sharp layer the same lines read as drawn lines rather than as light.
+  only over the box around the globe. A lens flare goes on in the glow layer only, where the
+  blur is what softens it; drawn on the sharp layer the same lines read as lines. Each arm is
+  segments whose alpha falls off with the square of the distance out, because a single line at
+  one alpha stops dead at its end and light does not. There is a long streak across and a short
+  faint vertical, and no diagonals: four even arms read as a drawn star rather than as an
+  optical artefact. `DEFCON_FLARE=0` turns it off for comparison.
 - **That upscale is the one loop written out by hand.** `Graphics.DrawImage` will do it in a
   line, but its bilinear stretch costs about 7 ns per destination pixel on a single thread,
   which at 1440p was half the frame. `GdiTarget.CompositeGlow` does the same filtering across
@@ -292,6 +295,7 @@ Useful when comparing backends or chasing a rendering difference; none are neede
 | `DEFCON_LAND` | Land fill colour as `r,g,b`, if you want it lighter or deeper |
 | `DEFCON_GLOWSTROKE` | Overrides the glow spread setting, for testing |
 | `DEFCON_UIFONT` | Point size for the `/c` dialog font, 6 to 48. Checks the layout at the sizes a high-DPI screen produces |
+| `DEFCON_FLARE` | Scales the flare over a detonation, 0 to 4. Zero turns it off, which is the only way to see what it contributes |
 
 A fixed seed plus a frozen clock is what makes the two backends render the very same world,
 which is the only way to compare them pixel for pixel.

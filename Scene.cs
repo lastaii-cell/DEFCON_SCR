@@ -26,6 +26,15 @@ public sealed class Scene
     /// <summary>Minimum stroke width inside the glow layer, in that layer's own pixels.</summary>
     private float GlowStrokeFloor => GlowStrokeOverride ?? _cfg.GlowStroke;
 
+    /// <summary>
+    /// Scales the flare over a detonation, for judging it. Zero turns it off, which is the
+    /// only way to see what it is actually contributing: comparing one flare against another
+    /// says nothing about whether either is visible.
+    /// </summary>
+    private static readonly float FlareScale =
+        float.TryParse(Environment.GetEnvironmentVariable("DEFCON_FLARE"), out float fl)
+            ? Math.Clamp(fl, 0f, 4f) : 1f;
+
     private int _lastDefcon = 5;
     private bool _lastAftermath;
     private string _alert;
@@ -728,25 +737,51 @@ public sealed class Scene
     }
 
     /// <summary>
-    /// A lens flare over a detonation: the long anamorphic streak across, a shorter vertical
-    /// and two diagonals. Drawn into the glow layer only, so the blur is what softens it -
-    /// laid on the sharp layer these read as drawn lines rather than as light.
+    /// One arm of a flare, in segments whose alpha falls away toward the tip. A single line at
+    /// one alpha stops dead at its end, which is what makes a flare read as a drawn stroke -
+    /// light thins out instead.
+    /// </summary>
+    private void FlareArm(float cx, float cy, float dx, float dy, float len, float alpha, float width)
+    {
+        const int steps = 8;
+        float px = cx, py = cy;
+
+        for (int i = 1; i <= steps; i++)
+        {
+            float u = i / (float)steps;
+            float nx = cx + dx * len * u;
+            float ny = cy + dy * len * u;
+
+            // Taken at the middle of the segment, and squared, so the arm is brightest at the
+            // fireball and gone well before its nominal length.
+            float mid = (i - 0.5f) / steps;
+            float a = alpha * (1f - mid) * (1f - mid);
+            if (a > 0.008f) _target.Line(px, py, nx, ny, Col(Palette.Fade(Color.White, a)), width);
+
+            px = nx; py = ny;
+        }
+    }
+
+    /// <summary>
+    /// A lens flare over a detonation: the long streak across, and a short faint vertical.
+    /// Four even arms read as a drawn star rather than as an optical artefact, so the
+    /// diagonals are gone and the vertical is a quarter of the length. Glow layer only - on
+    /// the sharp layer the same lines look like lines.
     /// </summary>
     private void Flare(float cx, float cy, float reach, float alpha)
     {
-        if (reach < 2f || alpha <= 0.02f) return;
+        if (reach < 3f || alpha <= 0.02f) return;
 
-        Color bar = Col(Palette.Fade(Color.White, alpha * 0.7f));
-        Color arm = Col(Palette.Fade(Color.White, alpha * 0.34f));
+        float a = alpha * 0.38f * FlareScale;
+        if (a <= 0.004f) return;
+        float wide = Stroke(1.2f);
+        float thin = Stroke(1f);
 
-        _target.Line(cx - reach, cy, cx + reach, cy, bar, Stroke(1.5f));
+        FlareArm(cx, cy, -1f, 0f, reach, a, wide);
+        FlareArm(cx, cy, 1f, 0f, reach, a, wide);
 
-        float up = reach * 0.34f;
-        _target.Line(cx, cy - up, cx, cy + up, arm, Stroke(1.2f));
-
-        float d = reach * 0.2f;
-        _target.Line(cx - d, cy - d, cx + d, cy + d, arm, Stroke(1f));
-        _target.Line(cx - d, cy + d, cx + d, cy - d, arm, Stroke(1f));
+        FlareArm(cx, cy, 0f, -1f, reach * 0.26f, a * 0.55f, thin);
+        FlareArm(cx, cy, 0f, 1f, reach * 0.26f, a * 0.55f, thin);
     }
 
     private void DrawBlasts(ref Cam cam, float px, World w)
