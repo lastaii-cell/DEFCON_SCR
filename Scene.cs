@@ -27,9 +27,9 @@ public sealed class Scene
     private float GlowStrokeFloor => GlowStrokeOverride ?? _cfg.GlowStroke;
 
     /// <summary>
-    /// Scales the flare over a detonation, for judging it. Zero turns it off, which is the
-    /// only way to see what it is actually contributing: comparing one flare against another
-    /// says nothing about whether either is visible.
+    /// Scales the flare over a detonation, 1 being the built-in strength. Zero turns it off,
+    /// which is the only way to see what it is actually contributing: comparing one flare
+    /// against another says nothing about whether either is visible.
     /// </summary>
     private static readonly float FlareScale =
         float.TryParse(Environment.GetEnvironmentVariable("DEFCON_FLARE"), out float fl)
@@ -772,7 +772,7 @@ public sealed class Scene
     {
         if (reach < 3f || alpha <= 0.02f) return;
 
-        float a = alpha * 0.38f * FlareScale;
+        float a = alpha * 0.76f * FlareScale;
         if (a <= 0.004f) return;
         float wide = Stroke(1.2f);
         float thin = Stroke(1f);
