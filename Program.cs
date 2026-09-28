@@ -56,6 +56,10 @@ internal static class Program
                     Capture(cfg, args);
                     break;
 
+                case 'r':               // /r <file> - which bloc owns what
+                    Territory(args);
+                    break;
+
                 default:
                     using (var f = new ConfigForm(cfg)) f.ShowDialog();
                     break;
@@ -394,6 +398,52 @@ internal static class Program
                       $"busiest deck {fullest}");
         sb.AppendLine("  beams visible at: " + string.Join(", ", beamTimes.Select(v => $"{v:0.0}s")));
         File.WriteAllText(outPath, sb.ToString());
+    }
+
+    /// <summary>
+    /// Dumps the bloc every city falls in, and a coarse map of the whole world, so a change to
+    /// the territory boxes can be checked against an atlas instead of squinted at on a globe.
+    /// </summary>
+    private static void Territory(string[] args)
+    {
+        string outPath = args.Length > 1 ? args[1] : Path.Combine(Path.GetTempPath(), "defcon-territory.txt");
+        var sb = new System.Text.StringBuilder();
+
+        City[] cities = CityData.Build();
+        foreach (City c in cities) c.Territory = Territories.At(c.Lat, c.Lon);
+
+        sb.AppendLine("cities by bloc");
+        for (int t = 0; t < Territories.Count; t++)
+        {
+            var mine = cities.Where(c => c.Territory == t)
+                             .OrderByDescending(c => c.Population).ToList();
+            sb.AppendLine($"  {Territories.ShortNames[t]} ({mine.Count}): " +
+                          string.Join(", ", mine.Select(c => c.Name)));
+        }
+        var orphans = cities.Where(c => c.Territory < 0).ToList();
+        sb.AppendLine($"  unassigned ({orphans.Count}): " +
+                      string.Join(", ", orphans.Select(c => c.Name)));
+
+        // A coarse map: one letter per cell, dots for sea and unclaimed ground.
+        const string key = "ASERFI";
+        sb.AppendLine();
+        sb.AppendLine("land by bloc, 4 degrees per cell, 80N at the top");
+        Geo.Load();
+        for (float lat = 80f; lat >= -56f; lat -= 4f)
+        {
+            var row = new System.Text.StringBuilder($"{lat,4:0} ");
+            for (float lon = -180f; lon < 180f; lon += 2f)
+            {
+                if (!Geo.IsLand(lat, lon)) { row.Append(' '); continue; }
+                int t = Territories.At(lat, lon);
+                row.Append(t < 0 ? '.' : key[t]);
+            }
+            sb.AppendLine(row.ToString());
+        }
+        sb.AppendLine("key: A=N.AM S=S.AM E=EUR R=RUS F=AFR I=ASI  .=land, no bloc");
+
+        File.WriteAllText(outPath, sb.ToString());
+        Console.WriteLine($"wrote {outPath}");
     }
 
     /// <summary>Reports which drawing backend this machine will actually get, and why.</summary>

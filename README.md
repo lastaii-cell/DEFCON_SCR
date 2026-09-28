@@ -119,6 +119,7 @@ why the script sets the value directly. If you would rather have it in the dropd
 | `DefconSaver.scr /b <file> [w h frames]` | Steady-state frame timing with a per-stage breakdown. Software path only: `D2DTarget` needs a window, so it cannot be measured offscreen |
 | `DefconSaver.scr /m <file> [seconds]` | Ship movement statistics, for checking that units travel rather than fidget in place |
 | `DefconSaver.scr /d <file>` | Reports which drawing backend this machine gets, and why |
+| `DefconSaver.scr /r <file>` | Every city's bloc, and a coarse map of which bloc owns what land |
 
 Note that PowerShell's `Start-Process` on a `.scr` goes through the shell and ignores your
 arguments. Invoke it with the call operator (`& .\dist\DefconSaver.scr /w`) or from `cmd`.
@@ -270,8 +271,12 @@ python tools\make_land_bin.py ne_50m_land.geojson Assets\land.bin
 - A landmass that is almost entirely behind the globe contributes a thin sliver of fill along
   the limb rather than its true silhouette. At that angle the difference is a pixel or two.
 - Inland seas that are holes in a land polygon (the Caspian, for one) are filled as land.
-- Bloc boundaries are boxes, so a few places sit on the wrong side of a line — southern Spain
-  reads as Africa, Vladivostok as Asia.
+- Bloc boundaries are still boxes, so the lines are straight where a real border would not be.
+  The boxes are an ordered list and the first one containing a point wins, which lets a narrow
+  claim sit ahead of a broad one; that is how Anatolia, southern Spain, the Caucasus, Greenland
+  and the Primorsky coast are kept out of the blocs whose wide boxes would otherwise reach over
+  them. The Middle East and Iran belong to Africa, as they do in the game. Run `/r` to see the
+  whole assignment as a map before changing any of it.
 - The camera turns at a steady rate and does not follow the fighting. An earlier version aimed
   it at each launch and detonation, which at DEFCON 1 meant a new target several times a second
   and a view that jumped rather than turned.
