@@ -918,13 +918,17 @@ public sealed class Scene
         for (int f = 0; f < World.Factions; f++)
         {
             if (!w.Playing[f]) continue;
-            Color c = Palette.Faction[f];
             float rx = _target.Width - m;
-            _target.FillRect(new RectangleF(rx - 9f * _ui, ty + rowH * 0.22f, 9f * _ui, fMed * 0.95f), c);
+
+            // The swatch is the only thing in this block that carries a bloc's colour, and it
+            // is dimmed so six of them read as a key beside the figures rather than competing
+            // with them.
+            _target.FillRect(new RectangleF(rx - 9f * _ui, ty + rowH * 0.22f, 9f * _ui, fMed * 0.95f),
+                             Palette.Fade(Palette.Faction[f], 0.55f));
 
             int units = w.CountUnits(f, _ => true);
             _target.TextIn($"{Territories.ShortNames[f]}  {units,3}U  {w.Kills[f],7:#,##0.0}M",
-                           FontSlot.Medium, Palette.Fade(c, 0.92f),
+                           FontSlot.Medium, statusMid,
                            new RectangleF(0, ty, rx - 14f * _ui, rowH), TextAlign.Right);
             ty += rowH;
         }
@@ -933,7 +937,7 @@ public sealed class Scene
         foreach (Ticker t in w.Log)
         {
             float a = Math.Clamp(1.6f - t.Age * 0.045f, 0.18f, 1f);
-            _target.Text(t.Text, FontSlot.Medium, Palette.Fade(t.Colour, a), m, ly);
+            _target.Text(t.Text, FontSlot.Medium, Palette.Fade(Palette.Status, a), m, ly);
             ly += fMed * 1.5f;
         }
 

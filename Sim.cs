@@ -178,7 +178,6 @@ public sealed class Tracer
 public sealed class Ticker
 {
     public string Text;
-    public Color Colour;
     public float Age;
 }
 
@@ -256,8 +255,8 @@ public sealed class World
         SpinRate = 2.6f + (float)Rng.NextDouble() * 1.6f;
         if (Rng.Next(2) == 0) SpinRate = -SpinRate;
 
-        Say("DEFCON 5 - FORCES DEPLOYING", Palette.Status);
-        Say(ScenarioName, Palette.HudDim);
+        Say("DEFCON 5 - FORCES DEPLOYING");
+        Say(ScenarioName);
     }
 
     private void SetUpTeams()
@@ -438,7 +437,7 @@ public sealed class World
                 PlatformsRevealed++;
             }
         }
-        Say("ORBITAL PLATFORMS UNMASKED", Palette.Status);
+        Say("ORBITAL PLATFORMS UNMASKED");
     }
 
     private Unit Add(UnitKind kind, int faction, float lat, float lon, float delay, int ammo = 0)
@@ -515,11 +514,11 @@ public sealed class World
             PhaseTime = PhaseSeconds[Defcon];
             switch (Defcon)
             {
-                case 4: Say("DEFCON 4 - FLEETS UNDER WAY", Palette.Status); break;
-                case 3: Say("DEFCON 3 - AIR PATROLS LAUNCHED", Palette.Status); break;
-                case 2: Say("DEFCON 2 - WEAPONS FREE", Palette.Status); break;
+                case 4: Say("DEFCON 4 - FLEETS UNDER WAY"); break;
+                case 3: Say("DEFCON 3 - AIR PATROLS LAUNCHED"); break;
+                case 2: Say("DEFCON 2 - WEAPONS FREE"); break;
                 case 1:
-                    Say("DEFCON 1 - NUCLEAR RELEASE AUTHORISED", Palette.Status);
+                    Say("DEFCON 1 - NUCLEAR RELEASE AUTHORISED");
                     RevealOrbitals();
                     break;
             }
@@ -528,7 +527,7 @@ public sealed class World
         {
             Aftermath = true;
             PhaseTime = PhaseSeconds[0];
-            Say("EXCHANGE COMPLETE - END OF SIMULATION", Palette.Status);
+            Say("EXCHANGE COMPLETE - END OF SIMULATION");
         }
     }
 
@@ -687,8 +686,7 @@ public sealed class World
         LasersFired++;
 
         float killed = Detonate(c.Lat, c.Lon, u.Faction, c, announce: false, yield: 0.5f);
-        Say($"ORBITAL {(again ? "RESTRIKE" : "STRIKE")} - {c.Name} - {killed:0.0}M DEAD",
-            Palette.Hot(Palette.Faction[u.Faction], 0.45f));
+        Say($"ORBITAL {(again ? "RESTRIKE" : "STRIKE")} - {c.Name} - {killed:0.0}M DEAD");
     }
 
     /// <summary>How near its station counts as on it. Below this the ship stops steering.</summary>
@@ -970,7 +968,7 @@ public sealed class World
         LaunchNuke(u.Faction, u.Lat, u.Lon, tLat, tLon, city);
 
         if (Rng.Next(5) == 0)
-            Say($"LAUNCH DETECTED - {Territories.ShortNames[u.Faction]}", Palette.Faction[u.Faction]);
+            Say($"LAUNCH DETECTED - {Territories.ShortNames[u.Faction]}");
     }
 
     private void LaunchNuke(int faction, float sLat, float sLon, float tLat, float tLon, City city)
@@ -1107,8 +1105,7 @@ public sealed class World
             t.Alive = false;
             PlatformsLost++;
             AddBlast(t.Lat, t.Lon, 2.2f, 1.6f, m.Faction, t.Alt);
-            Say($"{Territories.ShortNames[t.Faction]} PLATFORM DESTROYED",
-                Palette.Faction[t.Faction]);
+            Say($"{Territories.ShortNames[t.Faction]} PLATFORM DESTROYED");
             return;
         }
 
@@ -1167,7 +1164,7 @@ public sealed class World
         }
 
         if (announce && aimed != null && killed > 0.4f)
-            Say($"{aimed.Name} HIT - {killed:0.0}M DEAD", Palette.Faction[faction]);
+            Say($"{aimed.Name} HIT - {killed:0.0}M DEAD");
         return killed;
     }
 
@@ -1241,7 +1238,7 @@ public sealed class World
                 best.Alive = false;
                 AddBlast(best.Lat, best.Lon, 1.0f, 0.8f, a.Faction);
                 if (best.Kind == UnitKind.Carrier)
-                    Say($"{Territories.ShortNames[best.Faction]} CARRIER LOST", Palette.Faction[best.Faction]);
+                    Say($"{Territories.ShortNames[best.Faction]} CARRIER LOST");
             }
         }
 
@@ -1337,10 +1334,14 @@ public sealed class World
 
     // ---- helpers -----------------------------------------------------------
 
-    public void Say(string text, Color colour)
+    /// <summary>
+    /// Adds a line to the log. There is no colour argument: the log is one instrument and
+    /// draws in the readout green, so a per-line colour would only have been thrown away.
+    /// </summary>
+    public void Say(string text)
     {
         if (string.IsNullOrEmpty(text)) return;
-        Log.Add(new Ticker { Text = text, Colour = colour });
+        Log.Add(new Ticker { Text = text });
     }
 
     public int CountUnits(int faction, Func<Unit, bool> filter)

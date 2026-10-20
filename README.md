@@ -217,10 +217,13 @@ Seven details worth knowing if you change things:
   is precisely what used to make ships pirouette. Stations are 2.7 to 6 degrees out, because a
   degree is about five pixels at 1080p and a ship icon is nearer fifteen: any closer and the
   group draws as one smudge.
-- **The readiness readout and its announcements are one colour**, green, including the big
-  banner. That banner is drawn twice: once crisp, and once into the glow layer through its own
-  font slot, because that layer is a quarter of the size and a full-size font would land four
-  times too large there.
+- **The whole readout is one colour**, green: the DEFCON ladder, the clock and casualty
+  total, the per-bloc tallies, the event log and the big centre banner. The only colour in the
+  interface is the dimmed swatch at the end of each tally row, which is there as a key to the
+  blocs on the globe. Everything used to be tinted by faction, and six colours of text in one
+  corner read as decoration rather than as an instrument. That banner is drawn twice: once
+  crisp, and once into the glow layer through its own font slot, because that layer is a
+  quarter of the size and a full-size font would land four times too large there.
 - **The glow**, on both backends, is the scene re-drawn into a quarter-size *transparent*
   buffer at half alpha and blended back up. Over a near-black background that reads as additive
   bloom, and it avoids GDI+'s slow colour-matrix path. It is composited only over the box around
