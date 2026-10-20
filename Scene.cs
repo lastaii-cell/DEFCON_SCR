@@ -908,7 +908,10 @@ public sealed class Scene
         _target.Text(w.ScenarioName, FontSlot.Small, statusDim,
                      m, y + cellH + 6f * _ui + fMed * 1.6f);
 
-        _target.TextIn($"T+{Fmt(w.Clock)}", FontSlot.Big, statusBright,
+        // Same green as the dead count under it and the tallies below that. At full Status it
+        // was the brightest thing in the corner; the clock earns its prominence from the Big
+        // font slot, so it does not need the extra brightness as well.
+        _target.TextIn($"T+{Fmt(w.Clock)}", FontSlot.Big, statusMid,
                        new RectangleF(0, m, _target.Width - m, fBig * 1.4f), TextAlign.Right);
         _target.TextIn($"DEAD {w.TotalDead():#,##0.0}M", FontSlot.Medium, statusMid,
                        new RectangleF(0, m + fBig * 1.6f, _target.Width - m, fMed * 1.5f), TextAlign.Right);
