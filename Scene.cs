@@ -923,7 +923,8 @@ public sealed class Scene
             // The swatch is the only thing in this block that carries a bloc's colour, and it
             // is dimmed so six of them read as a key beside the figures rather than competing
             // with them.
-            _target.FillRect(new RectangleF(rx - 9f * _ui, ty + rowH * 0.22f, 9f * _ui, fMed * 0.95f),
+            float swH = fMed * 0.95f;
+            _target.FillRect(new RectangleF(rx - 9f * _ui, ty + fMed * 0.10f, 9f * _ui, swH),
                              Palette.Fade(Palette.Faction[f], 0.55f));
 
             int units = w.CountUnits(f, _ => true);
@@ -968,17 +969,17 @@ public sealed class Scene
         _target.FillRect(new RectangleF(bx, by, bw, bh), Color.FromArgb(180, 2, 8, 20));
         _target.DrawRect(new RectangleF(bx, by, bw, bh), Palette.Fade(Palette.Limb, 0.7f), 1.2f * _ui);
 
-        _target.Text("FINAL TALLY", FontSlot.Medium, Palette.Hud, bx + 14f * _ui, by + 10f * _ui);
-        _target.TextIn("KILLED      LOST", FontSlot.Medium, Palette.HudDim,
+        _target.Text("FINAL TALLY", FontSlot.Medium, Palette.Status, bx + 14f * _ui, by + 10f * _ui);
+        _target.TextIn("KILLED      LOST", FontSlot.Medium, Palette.Fade(Palette.Status, 0.42f),
                        new RectangleF(0, by + 10f * _ui, bx + bw - 14f * _ui, rowH), TextAlign.Right);
 
         float y = by + 10f * _ui + rowH * 1.25f;
         foreach (int f in order)
         {
-            _target.Text(Territories.Names[f], FontSlot.Medium, Palette.Faction[f], bx + 14f * _ui, y);
+            Color row = Palette.Fade(Palette.Status, 0.78f);
+            _target.Text(Territories.Names[f], FontSlot.Medium, row, bx + 14f * _ui, y);
             _target.TextIn($"{w.Kills[f],8:#,##0.0}M {w.Losses[f],8:#,##0.0}M", FontSlot.Medium,
-                           Palette.Faction[f],
-                           new RectangleF(0, y, bx + bw - 14f * _ui, rowH), TextAlign.Right);
+                           row, new RectangleF(0, y, bx + bw - 14f * _ui, rowH), TextAlign.Right);
             y += rowH;
         }
     }

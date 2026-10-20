@@ -218,10 +218,14 @@ Seven details worth knowing if you change things:
   degree is about five pixels at 1080p and a ship icon is nearer fifteen: any closer and the
   group draws as one smudge.
 - **The whole readout is one colour**, green: the DEFCON ladder, the clock and casualty
-  total, the per-bloc tallies, the event log and the big centre banner. The only colour in the
+  total, the per-bloc tallies, the event log, the aftermath FINAL TALLY panel and the big
+  centre banner. The only colour in the
   interface is the dimmed swatch at the end of each tally row, which is there as a key to the
   blocs on the globe. Everything used to be tinted by faction, and six colours of text in one
-  corner read as decoration rather than as an instrument. That banner is drawn twice: once
+  corner read as decoration rather than as an instrument. Right-aligned text is drawn with
+  `ParagraphAlignment.Near`, so it sits at the top of its row box rather than centred in it —
+  a swatch beside it has to be positioned against the glyphs' cap height, which is worth
+  measuring off a render rather than deriving. That banner is drawn twice: once
   crisp, and once into the glow layer through its own font slot, because that layer is a
   quarter of the size and a full-size font would land four times too large there.
 - **The glow**, on both backends, is the scene re-drawn into a quarter-size *transparent*
