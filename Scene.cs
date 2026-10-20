@@ -884,7 +884,7 @@ public sealed class Scene
         Color statusMid = Palette.Fade(Palette.Status, 0.72f);
         Color statusDim = Palette.Fade(Palette.Status, 0.42f);
 
-        _target.Text("DEFCON", FontSlot.Big, statusBright, m, m);
+        _target.Text("DEFCON", FontSlot.Big, statusMid, m, m);
 
         float cellW = 26f * _ui, cellH = 24f * _ui;
         float y = m + fBig * 1.5f;

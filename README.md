@@ -5,7 +5,7 @@ Mac-only DEFCON Globe screensaver that Ambrosia shipped alongside it. A vector g
 slowly against near-black space while six blocs fight a full nuclear exchange on it: fleets
 put to sea, radar sweeps, bombers scramble, and at DEFCON 1 the missiles fly.
 
-![The globe at DEFCON 1, warheads in flight over the Americas](screenshots/defcon1-exchange.png)
+![DEFCON 1 over the Pacific, a detonation burning on the limb](screenshots/defcon1-exchange.png)
 
 Nothing here is Introversion's code or art — it is an original build that borrows the look.
 
@@ -46,8 +46,9 @@ sixteen rounds to pay for it.
 
 ![Orbital platforms in their tracks, with an orbital strike in the log](screenshots/orbital-platforms.png)
 
-The coloured arcs are the stretch of orbit each platform is about to fly through, and the log
-records a strike on Chongqing.
+The coloured arcs are the stretch of orbit each platform is about to fly through. A beam is
+mid-strike at the bottom of the globe, and the log carries the strikes and their follow-up
+restrikes as they land.
 
 A platform is not defenceless. It carries five interceptors and will put one in the way of an
 anti-satellite shot climbing toward it, one at a time and never two at the same round. They
@@ -146,10 +147,13 @@ The readout, green throughout, with the scanlines on:
 
 ![The DEFCON readout in the top-left corner](screenshots/hud-readout.png)
 
-The haze over south and east Asia at DEFCON 3, while the population is still intact. It burns
-off city by city as the warheads land:
+Only the lit readiness cell is at full brightness; everything else in the interface sits one
+step down, so the eye goes to the DEFCON level first.
 
-![Population haze over south and east Asia](screenshots/population-haze.png)
+The haze over the Americas at DEFCON 3, while the population is still intact. It burns off
+city by city as the warheads land:
+
+![Population haze over the Americas](screenshots/population-haze.png)
 
 ## Performance
 
