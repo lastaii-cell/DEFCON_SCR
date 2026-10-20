@@ -60,7 +60,8 @@ internal static unsafe class Program
         int w = Size(args, 2, 1920), h = Size(args, 3, 1080);
         Directory.CreateDirectory(dir);
 
-        Settings cfg = Settings.Load();
+        Settings cfg = Config.Load(out string source);
+        Console.WriteLine($"settings: {source}");
         Geo.Load();
 
         var world = new World(Seed);
@@ -96,7 +97,7 @@ internal static unsafe class Program
 
     private static int Run(string[] args, bool fullscreen)
     {
-        Settings cfg = Settings.Load();
+        Settings cfg = Config.Load(out string source);
         Geo.Load();
 
         Sdl sdl = Sdl.GetApi();
@@ -108,8 +109,7 @@ internal static unsafe class Program
 
         int w = Size(args, 1, 1280), h = Size(args, 2, 800);
 
-        WindowFlags flags = WindowFlags.Shown | WindowFlags.Resizable;
-        if (fullscreen) flags |= WindowFlags.FullscreenDesktop | WindowFlags.Borderless;
+        var flags = WindowFlags.Shown | WindowFlags.Resizable;
 
         Silk.NET.SDL.Window* win = sdl.CreateWindow(
             "DEFCON", Sdl.WindowposCentered, Sdl.WindowposCentered, w, h, (uint)flags);
@@ -130,8 +130,14 @@ internal static unsafe class Program
             return 1;
         }
 
+        if (fullscreen)
+        {
+            if (sdl.SetWindowFullscreen(win, (uint)WindowFlags.FullscreenDesktop) < 0)
+                Console.Error.WriteLine($"fullscreen refused: {sdl.GetErrorS()}");
+            sdl.ShowCursor(0);
+        }
+
         sdl.GetRendererOutputSize(ren, ref w, ref h);
-        if (fullscreen) sdl.ShowCursor(0);
 
         using var target = new SkiaTarget(cfg);
         target.Resize(w, h);
@@ -151,8 +157,11 @@ internal static unsafe class Program
             return 1;
         }
 
-        Console.WriteLine($"DEFCON saver: {w}x{h}, backend {target.Backend}, " +
-                          $"bloom {cfg.Bloom}, renderer {(fullscreen ? "fullscreen" : "window")}");
+        Console.WriteLine($"DEFCON saver  {w}x{h}  {(fullscreen ? "fullscreen" : "window")}");
+        Console.WriteLine($"  video driver : {sdl.GetCurrentVideoDriverS()}");
+        Console.WriteLine($"  drawing      : {target.Backend}, bloom {cfg.Bloom}, " +
+                          $"scanlines {(cfg.Scanlines ? "on" : "off")}");
+        Console.WriteLine($"  settings     : {source}");
 
         float frame = 1f / Math.Clamp(cfg.TargetFps, 20, 120);
         long ticks = Environment.TickCount64;
