@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>defcon-saver</AssemblyName>
+    <RootNamespace>DefconSaver</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <DebugType>none</DebugType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <!--
+    The simulation and the whole of the drawing logic are shared verbatim with the Windows
+    build. They are linked rather than copied so there is exactly one of each file: Scene
+    draws against IDrawTarget and never touches a platform type, which is what makes this
+    possible at all.
+  -->
+  <ItemGroup>
+    <Compile Include="../Sim.cs"         Link="shared/Sim.cs" />
+    <Compile Include="../Scene.cs"       Link="shared/Scene.cs" />
+    <Compile Include="../Geo.cs"         Link="shared/Geo.cs" />
+    <Compile Include="../LandFill.cs"    Link="shared/LandFill.cs" />
+    <Compile Include="../Cities.cs"      Link="shared/Cities.cs" />
+    <Compile Include="../Territories.cs" Link="shared/Territories.cs" />
+    <Compile Include="../Palette.cs"     Link="shared/Palette.cs" />
+    <Compile Include="../Profile.cs"     Link="shared/Profile.cs" />
+    <Compile Include="../Settings.cs"    Link="shared/Settings.cs" />
+    <Compile Include="../IDrawTarget.cs" Link="shared/IDrawTarget.cs" />
+  </ItemGroup>
+
+  <!--
+    The Windows project gets this from the WinForms implicit usings. The shared files use
+    Color, PointF and RectangleF from System.Drawing.Primitives, which is cross-platform -
+    unlike System.Drawing.Common, which has been Windows-only since .NET 6 and is what the
+    GDI+ back end depends on.
+  -->
+  <ItemGroup>
+    <Using Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="*.cs" />
+    <EmbeddedResource Include="../Assets/land.bin" Link="Assets/land.bin" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="2.88.8" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.8" />
+    <PackageReference Include="Silk.NET.SDL" Version="2.21.0" />
+  </ItemGroup>
+
+</Project>

@@ -1,5 +1,3 @@
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -275,60 +273,110 @@ public static class Geo
         return rings;
     }
 
-    /// <summary>Rasterises the rings into an equirectangular land/sea mask.</summary>
+    /// <summary>
+    /// Rasterises the rings into an equirectangular land/sea mask. Scanline fill with the
+    /// nonzero winding rule, written out rather than handed to a graphics library, because
+    /// this is the only thing in the simulation half of the codebase that needed one - and a
+    /// land mask that depends on GDI+ cannot leave Windows.
+    /// </summary>
     private static bool[] BuildMask(Ring[] rings)
     {
         var mask = new bool[MaskW * MaskH];
-        using var bmp = new Bitmap(MaskW, MaskH, PixelFormat.Format24bppRgb);
-        using (Graphics g = Graphics.FromImage(bmp))
-        {
-            g.Clear(Color.Black);
-            g.SmoothingMode = SmoothingMode.None;
-            using var brush = new SolidBrush(Color.White);
 
-            foreach (Ring r in rings)
+        int longest = 0;
+        foreach (Ring r in rings) longest = Math.Max(longest, r.Count);
+        var pts = new PointF[longest];
+        var wrapped = new PointF[longest];
+        var xs = new float[longest];
+        var dir = new int[longest];
+
+        foreach (Ring r in rings)
+        {
+            if (r.Count < 3) continue;
+
+            bool wraps = false;
+            float prev = 0f;
+            for (int j = 0; j < r.Count; j++)
             {
-                if (r.Count < 3) continue;
-                var pts = new PointF[r.Count];
-                bool wraps = false;
-                float prev = 0f;
+                ToLatLon(r.Px[j], r.Py[j], r.Pz[j], out float la, out float lo);
+                if (j > 0 && Math.Abs(lo - prev) > 180f) wraps = true;
+                prev = lo;
+                pts[j] = new PointF((lo + 180f) * (MaskW / 360f), (90f - la) * (MaskH / 180f));
+            }
+
+            FillWinding(mask, pts, r.Count, xs, dir);
+
+            // Rings straddling the antimeridian are drawn a second time, with each point
+            // moved to whichever side it did not land on, so the half that wrapped off one
+            // edge still reaches the mask.
+            if (wraps)
+            {
                 for (int j = 0; j < r.Count; j++)
                 {
-                    ToLatLon(r.Px[j], r.Py[j], r.Pz[j], out float la, out float lo);
-                    if (j > 0 && Math.Abs(lo - prev) > 180f) wraps = true;
-                    prev = lo;
-                    pts[j] = new PointF((lo + 180f) * (MaskW / 360f), (90f - la) * (MaskH / 180f));
+                    float x = pts[j].X;
+                    wrapped[j] = new PointF(x < MaskW * 0.5f ? x + MaskW : x - MaskW, pts[j].Y);
                 }
-                g.FillPolygon(brush, pts, FillMode.Winding);
-
-                // Rings straddling the antimeridian are drawn a second time, shifted,
-                // so the half that wrapped off one edge still lands on the mask.
-                if (wraps)
-                {
-                    var shifted = new PointF[r.Count];
-                    for (int j = 0; j < r.Count; j++)
-                    {
-                        float x = pts[j].X;
-                        shifted[j] = new PointF(x < MaskW * 0.5f ? x + MaskW : x - MaskW, pts[j].Y);
-                    }
-                    g.FillPolygon(brush, shifted, FillMode.Winding);
-                }
+                FillWinding(mask, wrapped, r.Count, xs, dir);
             }
         }
-
-        BitmapData bd = bmp.LockBits(new Rectangle(0, 0, MaskW, MaskH),
-                                     ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
-        try
-        {
-            var row = new byte[bd.Stride];
-            for (int y = 0; y < MaskH; y++)
-            {
-                Marshal.Copy(bd.Scan0 + y * bd.Stride, row, 0, bd.Stride);
-                int o = y * MaskW;
-                for (int x = 0; x < MaskW; x++) mask[o + x] = row[x * 3] > 100;
-            }
-        }
-        finally { bmp.UnlockBits(bd); }
         return mask;
+    }
+
+    /// <summary>
+    /// One polygon into the mask, nonzero winding, pixels whose centre falls inside. The
+    /// crossing buffers are passed in so a few hundred rings do not allocate a few hundred
+    /// times.
+    /// </summary>
+    private static void FillWinding(bool[] mask, PointF[] pts, int count, float[] xs, int[] dir)
+    {
+        if (count < 3) return;
+
+        float minY = float.MaxValue, maxY = float.MinValue;
+        for (int i = 0; i < count; i++)
+        {
+            if (pts[i].Y < minY) minY = pts[i].Y;
+            if (pts[i].Y > maxY) maxY = pts[i].Y;
+        }
+
+        int y0 = Math.Max(0, (int)MathF.Floor(minY));
+        int y1 = Math.Min(MaskH - 1, (int)MathF.Ceiling(maxY));
+
+        for (int y = y0; y <= y1; y++)
+        {
+            float sy = y + 0.5f;
+            int n = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                PointF a = pts[i], b = pts[(i + 1) % count];
+                if (a.Y == b.Y) continue;
+                if (sy < MathF.Min(a.Y, b.Y) || sy >= MathF.Max(a.Y, b.Y)) continue;
+
+                xs[n] = a.X + (sy - a.Y) / (b.Y - a.Y) * (b.X - a.X);
+                dir[n] = b.Y > a.Y ? 1 : -1;
+                n++;
+            }
+            if (n < 2) continue;
+
+            for (int i = 1; i < n; i++)          // insertion sort; n is tiny
+            {
+                float kx = xs[i];
+                int kd = dir[i], j = i - 1;
+                while (j >= 0 && xs[j] > kx) { xs[j + 1] = xs[j]; dir[j + 1] = dir[j]; j--; }
+                xs[j + 1] = kx;
+                dir[j + 1] = kd;
+            }
+
+            int wind = 0, row = y * MaskW;
+            for (int i = 0; i < n - 1; i++)
+            {
+                wind += dir[i];
+                if (wind == 0) continue;
+
+                int xa = Math.Max(0, (int)MathF.Ceiling(xs[i] - 0.5f));
+                int xb = Math.Min(MaskW - 1, (int)MathF.Ceiling(xs[i + 1] - 0.5f) - 1);
+                for (int x = xa; x <= xb; x++) mask[row + x] = true;
+            }
+        }
     }
 }

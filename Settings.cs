@@ -1,4 +1,6 @@
+#if WINDOWS
 using Microsoft.Win32;
+#endif
 
 namespace DefconSaver;
 
@@ -22,6 +24,7 @@ public sealed class Settings
     public static Settings Load()
     {
         var s = new Settings();
+#if WINDOWS
         try
         {
             using RegistryKey k = Registry.CurrentUser.OpenSubKey(Key);
@@ -40,11 +43,13 @@ public sealed class Settings
             s.GlowStroke = GetFloat(k, "GlowStroke", s.GlowStroke, 0.9f, 3.0f);
         }
         catch { /* defaults are fine */ }
+#endif
         return s;
     }
 
     public void Save()
     {
+#if WINDOWS
         try
         {
             using RegistryKey k = Registry.CurrentUser.CreateSubKey(Key);
@@ -63,8 +68,10 @@ public sealed class Settings
             k.SetValue("GlowStroke", GlowStroke.ToString("0.##"));
         }
         catch { /* read-only registry: run with defaults */ }
+#endif
     }
 
+#if WINDOWS
     private static int GetInt(RegistryKey k, string name, int fallback)
     {
         object v = k.GetValue(name);
@@ -81,4 +88,5 @@ public sealed class Settings
         if (v == null) return fallback;
         return float.TryParse(v.ToString(), out float r) ? Math.Clamp(r, lo, hi) : fallback;
     }
+#endif
 }
